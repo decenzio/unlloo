@@ -427,9 +427,9 @@ const deployedContracts = {
         {
           inputs: [
             {
-              internalType: "uint256",
-              name: "poolIndex",
-              type: "uint256",
+              internalType: "address",
+              name: "tokenId",
+              type: "address",
             },
           ],
           name: "repayBorrow",

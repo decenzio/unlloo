@@ -4,25 +4,25 @@ pragma solidity ^0.8.20;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-    using SafeERC20 for IERC20;
+using SafeERC20 for IERC20;
 
-    struct LiquidityPoolStruct {
-        uint256 liquidity;
-        address tokenAddress;
-        uint256 depositAPR;
-        uint256 borrowAPR;
-        mapping(address => uint256) deposits;
-        mapping(address => uint256) depositTimestamps;
-        mapping(address => uint256) borrows;
-        mapping(address => uint256) borrowTimestamps;
-    }
+struct LiquidityPoolStruct {
+    uint256 liquidity;
+    address tokenAddress;
+    uint256 depositAPR;
+    uint256 borrowAPR;
+    mapping(address => uint256) deposits;
+    mapping(address => uint256) depositTimestamps;
+    mapping(address => uint256) borrows;
+    mapping(address => uint256) borrowTimestamps;
+}
 
-    struct LiquidityPoolSimpleStruct {
-        uint256 liquidity;
-        address tokenAddress;
-        uint256 depositAPR;
-        uint256 borrowAPR;
-    }
+struct LiquidityPoolSimpleStruct {
+    uint256 liquidity;
+    address tokenAddress;
+    uint256 depositAPR;
+    uint256 borrowAPR;
+}
 
 contract LoanMaster {
     // array of liquidity pools
@@ -45,32 +45,28 @@ contract LoanMaster {
     }
 
     // Initialize pools with actual token addresses after deployment
-    function initializePools(
-        address usdcToken,
-        address wethToken,
-        address wbtcToken
-    ) external onlyOwner {
+    function initializePools(address usdcToken, address wethToken, address wbtcToken) external onlyOwner {
         require(liquidityPools.length == 0, "Pools already initialized");
 
         // USDC pool
         LiquidityPoolStruct storage usdcPool = liquidityPools.push();
         usdcPool.tokenAddress = usdcToken;
-        usdcPool.depositAPR = 500;  // 5%
-        usdcPool.borrowAPR = 1000;  // 10%
+        usdcPool.depositAPR = 500; // 5%
+        usdcPool.borrowAPR = 1000; // 10%
         emit PoolCreated(0, usdcToken, 500, 1000);
 
         // WETH pool
         LiquidityPoolStruct storage wethPool = liquidityPools.push();
         wethPool.tokenAddress = wethToken;
-        wethPool.depositAPR = 300;  // 3%
-        wethPool.borrowAPR = 800;   // 8%
+        wethPool.depositAPR = 300; // 3%
+        wethPool.borrowAPR = 800; // 8%
         emit PoolCreated(1, wethToken, 300, 800);
 
         // WBTC pool
         LiquidityPoolStruct storage wbtcPool = liquidityPools.push();
         wbtcPool.tokenAddress = wbtcToken;
-        wbtcPool.depositAPR = 400;  // 4%
-        wbtcPool.borrowAPR = 900;   // 9%
+        wbtcPool.depositAPR = 400; // 4%
+        wbtcPool.borrowAPR = 900; // 9%
         emit PoolCreated(2, wbtcToken, 400, 900);
     }
 
@@ -136,8 +132,18 @@ contract LoanMaster {
         emit Borrowed(msg.sender, poolIndex, amount);
     }
 
-    function repayBorrow(uint256 poolIndex) external {
-        require(poolIndex < liquidityPools.length, "Invalid pool index");
+    function repayBorrow(address tokenId) external {
+        uint256 poolIndex = type(uint256).max;
+
+        // Find the pool with the matching token address
+        for (uint256 i = 0; i < liquidityPools.length; i++) {
+            if (liquidityPools[i].tokenAddress == tokenId) {
+                poolIndex = i;
+                break;
+            }
+        }
+
+        require(poolIndex != type(uint256).max, "Pool not found for token address");
         LiquidityPoolStruct storage pool = liquidityPools[poolIndex];
 
         uint256 borrowedAmount = pool.borrows[msg.sender];
@@ -154,8 +160,8 @@ contract LoanMaster {
         delete pool.borrowTimestamps[msg.sender];
         pool.liquidity += borrowedAmount;
 
-        IERC20(pool.tokenAddress).safeTransferFrom(msg.sender, address(this), totalRepayAmount);
-        emit BorrowRepaid(msg.sender, poolIndex, borrowedAmount, interest);
+        // Transfer the tokens back to the contract (principal + interest)
+        IERC20(tokenId).safeTransferFrom(msg.sender, address(this), totalRepayAmount);
     }
 
     // Getters
@@ -166,12 +172,14 @@ contract LoanMaster {
     function getLiquidityPoolByToken(address tokenId) external view returns (LiquidityPoolSimpleStruct memory) {
         for (uint256 i = 0; i < liquidityPools.length; i++) {
             if (liquidityPools[i].tokenAddress == tokenId) {
-        return LiquidityPoolSimpleStruct({
-            liquidity: liquidityPools[i].liquidity,
-            tokenAddress: liquidityPools[i].tokenAddress,
-            depositAPR: liquidityPools[i].depositAPR,
-            borrowAPR: liquidityPools[i].borrowAPR
-        });}
+                return
+                    LiquidityPoolSimpleStruct({
+                        liquidity: liquidityPools[i].liquidity,
+                        tokenAddress: liquidityPools[i].tokenAddress,
+                        depositAPR: liquidityPools[i].depositAPR,
+                        borrowAPR: liquidityPools[i].borrowAPR
+                    });
+            }
         }
         revert("Pool not found for token address");
     }

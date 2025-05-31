@@ -3,7 +3,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 
 /**
  * Deploys the LoanMaster contract, deploys (or references) tokens,
- * adds initial liquidity, and funds a few test accounts on local networks.
+ * adds initial liquidity, and funds all user accounts on local networks.
  */
 const deployLoanMaster: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
@@ -122,25 +122,27 @@ const deployLoanMaster: DeployFunction = async function (hre: HardhatRuntimeEnvi
   }
 
   // ──────────────────────────────────────────────────────
-  // 5. Fund a few test accounts (fresh contract handles!)
+  // 5. Fund all available test accounts
   // ──────────────────────────────────────────────────────
   if (networkName === "localhost" || networkName === "hardhat") {
-    console.log("\n📡 Funding test accounts...");
+    console.log("\n📡 Funding all user accounts in the local network...");
 
-    const testAccounts = await ethers.getSigners();
+    const allAccounts = await ethers.getSigners();
     const usdcContract = await ethers.getContractAt("MockERC20", usdcAddress);
     const wethContract = await ethers.getContractAt("MockERC20", wethAddress);
     const wbtcContract = await ethers.getContractAt("MockERC20", wbtcAddress);
 
-    for (let i = 1; i < Math.min(5, testAccounts.length); i++) {
-      const acct = testAccounts[i];
-      console.log(`   → ${acct.address}`);
+    for (const acct of allAccounts) {
+      if (acct.address.toLowerCase() === deployer.toLowerCase()) continue;
+
+      console.log(`   → Funding ${acct.address}`);
 
       await (await usdcContract.mint(acct.address, "100000000000")).wait(); // 100 000 USDC
       await (await wethContract.mint(acct.address, "100000000000000000000")).wait(); // 100 WETH
       await (await wbtcContract.mint(acct.address, "100000000")).wait(); // 1 WBTC
     }
-    console.log("✅ Test accounts funded!");
+
+    console.log("✅ All user accounts funded!");
   }
 
   // ──────────────────────────────────────────────────────

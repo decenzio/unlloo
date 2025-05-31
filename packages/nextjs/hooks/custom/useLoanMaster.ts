@@ -353,7 +353,7 @@ export function useLoanMaster() {
         address: loanMasterContractData.address,
         abi: loanMasterContractData.abi,
         functionName: "repayBorrow",
-        args: [BigInt(poolIndex)],
+        args: [tokenAddress],
         account: userAddress,
       });
 
