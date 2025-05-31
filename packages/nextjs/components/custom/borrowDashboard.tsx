@@ -8,7 +8,7 @@ const borrowableAssets = [
     name: "Ethereum",
     iconColor: "#627EEA",
     available: 12.5,
-    apy: 3.2,
+    apy: 3.9,
     variableApy: 3.5,
     userLimit: 1.25,
   },
@@ -39,7 +39,7 @@ const userBorrows = [
     name: "USD Coin",
     iconColor: "#2775CA",
     amount: 450,
-    apy: 2.8,
+    apy: 9.0,
     healthFactor: 1.85,
   },
 ];
@@ -176,11 +176,6 @@ export default function BorrowDashboard() {
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Stable APY</span>
               <span className="font-medium text-indigo-600">{selectedAsset.apy}%</span>
-            </div>
-
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Variable APY</span>
-              <span className="font-medium text-indigo-600">{selectedAsset.variableApy}%</span>
             </div>
           </div>
 
