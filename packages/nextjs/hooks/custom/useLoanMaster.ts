@@ -8,6 +8,7 @@ export const TOKEN_ADDRESSES = {
   USDC: "0xF1815bd50389c46847f0Bda824eC8da914045D14" as Address,
   WETH: "0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590" as Address,
   WBTC: "0xA0197b2044D28b08Be34d98b23c9312158Ea9A18" as Address,
+  UNLOO: "0x3084ae7cdb722689a47d41783507878b564f3b67" as Address,
 };
 
 // Interface for token metadata
@@ -41,6 +42,14 @@ const TOKEN_METADATA: Record<Address, TokenMetadata> = {
     decimals: 8,
     iconColor: "#F7931A",
     imageUrl: "https://assets.coingecko.com/coins/images/40143/standard/cbbtc.webp?1726136727",
+  },
+  [TOKEN_ADDRESSES.UNLOO]: {
+    symbol: "UNLOO",
+    name: "Unlloo Protocol",
+    decimals: 18,
+    iconColor: "#6B7280",
+    imageUrl:
+      "https://fcljjsnuzjacwqgiqiib.supabase.co/storage/v1/object/public/token_images/images/312a9958-4e00-46dc-a699-01f48f0eb4ec.jpg",
   },
 };
 
@@ -158,6 +167,7 @@ export function useLoanMaster() {
       [TOKEN_ADDRESSES.USDC]: 1000, // 10%
       [TOKEN_ADDRESSES.WETH]: 800, // 8%
       [TOKEN_ADDRESSES.WBTC]: 900, // 9%
+      [TOKEN_ADDRESSES.UNLOO]: 0, // 7.5%
     };
     return simulatedAPRs[tokenAddress] || 1000;
   }, []);
