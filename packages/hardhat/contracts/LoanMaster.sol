@@ -20,8 +20,24 @@ contract LoanMaster {
 
     constructor() {
         owner = msg.sender;
+        // Create three liquidity pools directly in the constructor
+        // USDC pool
+        LiquidityPoolStruct storage usdcPool = liquidityPools.push();
+        usdcPool.tokenAddress = 0xF1815bd50389c46847f0Bda824eC8da914045D14;
+        usdcPool.depositAPR = 500;
+        usdcPool.borrowAPR = 1000;
 
-        //create three liquidity pools
+        // WETH pool
+        LiquidityPoolStruct storage wethPool = liquidityPools.push();
+        wethPool.tokenAddress = 0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590;
+        wethPool.depositAPR = 300;
+        wethPool.borrowAPR = 800;
+
+        // WBTC pool
+        LiquidityPoolStruct storage wbtcPool = liquidityPools.push();
+        wbtcPool.tokenAddress = 0xA0197b2044D28b08Be34d98b23c9312158Ea9A18;
+        wbtcPool.depositAPR = 400;
+        wbtcPool.borrowAPR = 900;
     }
 
     function createLiquidityPool(address tokenAddress, uint256 depositAPR, uint256 borrowAPR) external onlyOwner {
@@ -91,6 +107,8 @@ contract LoanMaster {
 
         // Update the user's borrow balance
         pool.borrows[msg.sender] += amount;
+        // Store the current block timestamp for the borrow
+        pool.borrowTimestamps[msg.sender] = block.timestamp;
         pool.liquidity -= amount;
 
         //check for the other contract if we can do borrowing
@@ -153,5 +171,11 @@ contract LoanMaster {
         require(poolIndex < liquidityPools.length, "Invalid pool index");
         LiquidityPoolStruct storage pool = liquidityPools[poolIndex];
         return pool.borrows[user];
+    }
+
+    function getTotalLiquidity(uint256 poolIndex) external view returns (uint256) {
+        require(poolIndex < liquidityPools.length, "Invalid pool index");
+        LiquidityPoolStruct storage pool = liquidityPools[poolIndex];
+        return pool.liquidity;
     }
 }
