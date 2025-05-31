@@ -57,7 +57,7 @@ const getLevelInfo = (score: number) => {
 const convertToReputationMetrics = (reputationScore: ReputationScoreData): ReputationMetric[] => {
   return [
     {
-      label: "HISTORY",
+      label: "ONCHIN ACTIVITY",
       score: reputationScore.components.transactionBehavior,
       color: "text-green-600",
       bgColor: "bg-green-100",
@@ -71,14 +71,14 @@ const convertToReputationMetrics = (reputationScore: ReputationScoreData): Reput
       progressColor: "#3B9FF6FF",
     },
     {
-      label: "DAO",
+      label: "GOVERNANCE",
       score: reputationScore.components.daoActivity,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
       progressColor: "#8B5CF6",
     },
     {
-      label: "BAGS",
+      label: "NFTs",
       score: reputationScore.components.financialCapacity,
       color: "text-amber-600",
       bgColor: "bg-amber-100",
@@ -499,7 +499,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
               animate="visible"
               className="mb-10 bg-white rounded-xl p-6 shadow-md border border-gray-100"
             >
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Recommendations</h3>
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Some quests for you</h3>
               <ul className="space-y-3">
                 {reputationScore.recommendations.map((recommendation, index) => (
                   <motion.li
