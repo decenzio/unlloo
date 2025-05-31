@@ -40,7 +40,7 @@ const TOKEN_METADATA: Record<Address, TokenMetadata> = {
     name: "Wrapped Bitcoin",
     decimals: 8,
     iconColor: "#F7931A",
-    imageUrl: "https://assets.coingecko.com/coins/images/7598/small/wrapped_bitcoin_wbtc.png",
+    imageUrl: "https://assets.coingecko.com/coins/images/40143/standard/cbbtc.webp?1726136727",
   },
 };
 

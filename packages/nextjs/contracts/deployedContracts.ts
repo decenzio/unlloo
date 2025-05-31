@@ -5,9 +5,9 @@
 import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 
 const deployedContracts = {
-  31337: {
+  747: {
     LoanMaster: {
-      address: "0x0Ddfaa53cED6490ee2AceEA07ace6E06Cf07967d",
+      address: "0x22CD56a1EA5C0D041eFd2A56C199A46518Df7b98",
       abi: [
         {
           inputs: [],
