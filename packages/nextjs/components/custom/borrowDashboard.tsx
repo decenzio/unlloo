@@ -29,7 +29,6 @@ export default function BorrowDashboard() {
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<Address>(TOKEN_ADDRESSES.USDC);
   const [showAssetSelector, setShowAssetSelector] = useState(false);
   const [borrowAmount, setBorrowAmount] = useState("");
-  const [interestType, setInterestType] = useState<"stable" | "variable">("stable");
   const [isRepaying, setIsRepaying] = useState<Record<Address, boolean>>({});
   const [isBorrowing, setIsBorrowing] = useState(false);
 
@@ -392,30 +391,6 @@ export default function BorrowDashboard() {
                           MAX
                         </button>
                       </div>
-                    </div>
-
-                    {/* Interest Type Selection (for show) */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setInterestType("stable")}
-                        className={`py-2 rounded-lg font-medium transition-colors ${
-                          interestType === "stable"
-                            ? "bg-indigo-600 text-white"
-                            : "bg-white border border-indigo-200 text-indigo-600 hover:bg-gray-50"
-                        }`}
-                      >
-                        Stable (0.00%)
-                      </button>
-                      <button
-                        onClick={() => setInterestType("variable")}
-                        className={`py-2 rounded-lg font-medium transition-colors ${
-                          interestType === "variable"
-                            ? "bg-indigo-600 text-white"
-                            : "bg-white border border-indigo-200 text-indigo-600 hover:bg-gray-50"
-                        }`}
-                      >
-                        Variable (0.00%)
-                      </button>
                     </div>
 
                     <button
