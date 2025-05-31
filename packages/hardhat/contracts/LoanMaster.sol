@@ -149,33 +149,45 @@ contract LoanMaster {
         return liquidityPools.length;
     }
 
-    function getLiquidityPool(uint256 poolIndex) external view returns (LiquidityPoolSimpleStruct memory) {
-        require(poolIndex < liquidityPools.length, "Invalid pool index");
-        LiquidityPoolStruct storage pool = liquidityPools[poolIndex];
-        return
-            LiquidityPoolSimpleStruct({
-                liquidity: pool.liquidity,
-                tokenAddress: pool.tokenAddress,
-                depositAPR: pool.depositAPR,
-                borrowAPR: pool.borrowAPR
-            });
+    function getLiquidityPoolByToken(address tokenId) external view returns (LiquidityPoolSimpleStruct memory) {
+        for (uint256 i = 0; i < liquidityPools.length; i++) {
+            if (liquidityPools[i].tokenAddress == tokenId) {
+                return
+                    LiquidityPoolSimpleStruct({
+                        liquidity: liquidityPools[i].liquidity,
+                        tokenAddress: liquidityPools[i].tokenAddress,
+                        depositAPR: liquidityPools[i].depositAPR,
+                        borrowAPR: liquidityPools[i].borrowAPR
+                    });
+            }
+        }
+        revert("Pool not found for token address");
     }
 
-    function getUserDeposit(uint256 poolIndex, address user) external view returns (uint256) {
-        require(poolIndex < liquidityPools.length, "Invalid pool index");
-        LiquidityPoolStruct storage pool = liquidityPools[poolIndex];
-        return pool.deposits[user];
+    function getUserDeposit(address tokenId, address user) external view returns (uint256) {
+        for (uint256 i = 0; i < liquidityPools.length; i++) {
+            if (liquidityPools[i].tokenAddress == tokenId) {
+                return liquidityPools[i].deposits[user];
+            }
+        }
+        revert("Pool not found for token address");
     }
 
-    function getUserBorrow(uint256 poolIndex, address user) external view returns (uint256) {
-        require(poolIndex < liquidityPools.length, "Invalid pool index");
-        LiquidityPoolStruct storage pool = liquidityPools[poolIndex];
-        return pool.borrows[user];
+    function getUserBorrow(address tokenId, address user) external view returns (uint256) {
+        for (uint256 i = 0; i < liquidityPools.length; i++) {
+            if (liquidityPools[i].tokenAddress == tokenId) {
+                return liquidityPools[i].borrows[user];
+            }
+        }
+        revert("Pool not found for token address");
     }
 
-    function getTotalLiquidity(uint256 poolIndex) external view returns (uint256) {
-        require(poolIndex < liquidityPools.length, "Invalid pool index");
-        LiquidityPoolStruct storage pool = liquidityPools[poolIndex];
-        return pool.liquidity;
+    function getTotalLiquidity(address tokenId) external view returns (uint256) {
+        for (uint256 i = 0; i < liquidityPools.length; i++) {
+            if (liquidityPools[i].tokenAddress == tokenId) {
+                return liquidityPools[i].liquidity;
+            }
+        }
+        revert("Pool not found for token address");
     }
 }
