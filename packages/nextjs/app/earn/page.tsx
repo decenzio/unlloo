@@ -78,162 +78,172 @@ const EarnPage = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-        <div className="bg-base-200 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-2">Total Liquidity</h2>
-          <p className="text-4xl font-bold text-primary">{poolStats.totalLiquidity} ETH</p>
+        <div className="bg-purple-50 p-6 rounded-lg shadow-lg flex flex-col items-center text-center">
+          <h2 className="text-xl font-semibold mb-2 text-purple-700">Total Liquidity</h2>
+          <p className="text-4xl font-bold text-purple-700">{poolStats.totalLiquidity} ETH</p>
         </div>
-        <div className="bg-base-200 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-2">Active Loans</h2>
-          <p className="text-4xl font-bold text-primary">{poolStats.activeLoans}</p>
+        <div className="bg-green-50 p-6 rounded-lg shadow-lg flex flex-col items-center text-center">
+          <h2 className="text-xl font-semibold mb-2 text-green-700">Active Loans</h2>
+          <p className="text-4xl font-bold text-green-700">{poolStats.activeLoans}</p>
         </div>
-        <div className="bg-base-200 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-2">Average APY</h2>
-          <p className="text-4xl font-bold text-primary">{poolStats.averageAPY}%</p>
-        </div>
-      </div>
-      {/* Pool Selection */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Select Liquidity Pool</h2>
-        <div className="flex flex-wrap gap-3">
-          {availablePools.map(pool => (
-            <button
-              key={pool.id}
-              className={`btn btn-lg ${selectedPool === pool.id ? "btn-primary" : "btn-outline"}`}
-              onClick={() => handlePoolChange(pool.id)}
-            >
-              {pool.name}
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 text-sm text-gray-400">
-          Selected pool: {availablePools.find(p => p.id === selectedPool)?.name}
+        <div className="bg-yellow-50 p-6 rounded-lg shadow-lg flex flex-col items-center text-center">
+          <h2 className="text-xl font-semibold mb-2 text-yellow-700">Average APY</h2>
+          <p className="text-4xl font-bold text-yellow-700">{poolStats.averageAPY}%</p>
         </div>
       </div>
+
       {/* Main Content */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        {/* Provide Liquidity Section */}
-        <div className="bg-base-100 p-8 rounded-lg shadow-lg border border-base-300">
-          <h2 className="text-2xl font-bold mb-6">Provide Liquidity</h2>
+      <div className="mb-12">
+        {/* Provide Liquidity Section - now full width and centered */}
+        <div className="bg-base-100 p-8 rounded-lg shadow-lg border border-base-300 w-full flex flex-col items-center">
+          <h2 className="text-3xl font-bold mb-6 text-center">Provide Liquidity</h2>
 
           {connectedAddress ? (
             <>
-              <div className="mb-8">
-                <h3 className="text-xl mb-4">Your Stats</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-400">Deposited</p>
-                    <p className="text-xl font-bold">{userStats.deposited} ETH</p>
+              {/* Stats */}
+              <div className="mb-8 w-full flex flex-col items-center">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-2xl">
+                  {/* Deposited */}
+                  <div className="bg-base-200 rounded-lg shadow flex flex-col items-center py-2 px-1">
+                    <p className="text-sm text-gray-400 mb-0">Deposited</p>
+                    <p className="text-xl font-bold mt-0">{userStats.deposited} ETH</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Earned</p>
-                    <p className="text-xl font-bold text-green-500">+{userStats.earned} ETH</p>
+                  {/* Earned */}
+                  <div className="bg-base-200 rounded-lg shadow flex flex-col items-center py-2 px-1">
+                    <p className="text-sm text-gray-400 mb-0">Earned</p>
+                    <p className="text-xl font-bold text-green-500 mt-0">+{userStats.earned} ETH</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Current APY</p>
-                    <p className="text-xl font-bold">{userStats.apy}%</p>
+                  {/* APY */}
+                  <div className="bg-base-200 rounded-lg shadow flex flex-col items-center py-2 px-1">
+                    <p className="text-sm text-gray-400 mb-0">Current APY</p>
+                    <p className="text-xl font-bold mt-0">{userStats.apy}%</p>
                   </div>
                 </div>
               </div>
 
-              {/* Deposit Form */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold mb-2">Deposit</h3>
-                <div className="flex items-center mb-4">
-                  <input
-                    type="text"
-                    placeholder="0.0"
-                    className="input input-bordered flex-1 mr-2"
-                    value={depositAmount}
-                    onChange={e => setDepositAmount(e.target.value)}
-                  />
-                  <span className="text-lg font-bold">ETH</span>
+              {/* Pool Selection BELOW the stats */}
+              <div className="mb-8 w-full flex flex-col items-center">
+                <h3 className="text-xl font-bold mb-4 text-center">Select Liquidity Pool</h3>
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {availablePools.map(pool => (
+                    <button
+                      key={pool.id}
+                      className={`btn btn-sm ${selectedPool === pool.id ? "btn-primary" : "btn-outline"}`}
+                      onClick={() => handlePoolChange(pool.id)}
+                    >
+                      {pool.name}
+                    </button>
+                  ))}
                 </div>
-                <button
-                  className="btn btn-primary w-full"
-                  onClick={handleDeposit}
-                  disabled={!depositAmount || parseFloat(depositAmount) <= 0}
-                >
-                  Deposit to Earn
-                </button>
+                <div className="mt-3 text-sm text-gray-400 text-center">
+                  Selected pool: {availablePools.find(p => p.id === selectedPool)?.name}
+                </div>
               </div>
 
-              {/* Withdraw Form */}
-              <div>
-                <h3 className="text-lg font-bold mb-2">Withdraw</h3>
-                <div className="flex items-center mb-4">
-                  <input
-                    type="text"
-                    placeholder="0.0"
-                    className="input input-bordered flex-1 mr-2"
-                    value={withdrawAmount}
-                    onChange={e => setWithdrawAmount(e.target.value)}
-                  />
-                  <span className="text-lg font-bold">ETH</span>
+              {/* Deposit and Withdraw side by side, centered */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
+                {/* Deposit Form */}
+                <div className="bg-base-300 p-6 rounded-lg shadow-lg flex flex-col items-center">
+                  <h3 className="text-xl font-bold mb-2 text-center">Deposit</h3>
+                  <div className="flex items-center mb-4 w-full">
+                    <input
+                      type="text"
+                      placeholder="0.0"
+                      className="input input-bordered flex-1 mr-2"
+                      value={depositAmount}
+                      onChange={e => setDepositAmount(e.target.value)}
+                    />
+                    <span className="text-lg font-bold">ETH</span>
+                  </div>
+                  <button
+                    className="bg-purple-200 btn btn-primary w-full"
+                    onClick={handleDeposit}
+                    disabled={!depositAmount || parseFloat(depositAmount) <= 0}
+                  >
+                    Deposit to Earn
+                  </button>
                 </div>
-                <button
-                  className="btn btn-outline w-full"
-                  onClick={handleWithdraw}
-                  disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0}
-                >
-                  Withdraw
-                </button>
+
+                {/* Withdraw Form */}
+                <div className="bg-base-300 p-6 rounded-lg shadow-lg flex flex-col items-center">
+                  <h3 className="text-xl font-bold mb-2 text-center">Withdraw</h3>
+                  <div className="flex items-center mb-4 w-full">
+                    <input
+                      type="text"
+                      placeholder="0.0"
+                      className="input input-bordered flex-1 mr-2"
+                      value={withdrawAmount}
+                      onChange={e => setWithdrawAmount(e.target.value)}
+                    />
+                    <span className="text-lg font-bold">ETH</span>
+                  </div>
+                  <button
+                    className="bg-purple-200 btn btn-outline w-full"
+                    onClick={handleWithdraw}
+                    disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0}
+                  >
+                    Withdraw
+                  </button>
+                </div>
               </div>
             </>
           ) : (
-            <div className="text-center py-12">
+            <div className="text-center py-12 w-full flex flex-col items-center">
               <p className="text-xl mb-4">Connect your wallet to provide liquidity</p>
               <button className="btn btn-primary">Connect Wallet</button>
             </div>
           )}
         </div>
-
-        {/* Info Section */}
-        <div className="bg-base-100 p-8 rounded-lg shadow-lg border border-base-300">
-          <h2 className="text-2xl font-bold mb-6">How It Works</h2>
-
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-xl font-semibold mb-2">Earn Passive Income</h3>
-              <p className="text-gray-400">
-                By providing liquidity to the pool, you earn interest from borrowers who take out uncollateralized
-                loans.
+      </div>
+      {/* How It Works Section - now full width below */}
+      <div className="bg-base-100 p-6 rounded-lg shadow-lg border border-base-300 mb-10">
+        <h2 className="text-2xl font-bold mb-6 text-center">How It Works</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Left column */}
+          <div className="space-y-4">
+            <div className="bg-base-200 rounded p-4">
+              <h3 className="text-lg font-semibold mb-1">Earn Passive Income</h3>
+              <p className="text-gray-500 text-sm">
+                Provide liquidity to the pool and earn interest from borrowers who take out uncollateralized loans.
               </p>
             </div>
-
-            <div>
-              <h3 className="text-xl font-semibold mb-2">Risk Assessment</h3>
-              <p className="text-gray-400">
+            <div className="bg-base-200 rounded p-4">
+              <h3 className="text-lg font-semibold mb-1">Risk Assessment</h3>
+              <p className="text-gray-500 text-sm">
                 Our reputation-based system evaluates borrowers to minimize default risk and protect your deposits.
               </p>
             </div>
-
-            <div>
-              <h3 className="text-xl font-semibold mb-2">Dynamic Interest Rates</h3>
-              <p className="text-gray-400">APY varies based on pool utilization and borrower reputation scores.</p>
-            </div>
-
-            <div>
-              <h3 className="text-xl font-semibold mb-2">Withdraw Anytime</h3>
-              <p className="text-gray-400">
-                Your funds are not locked. You can withdraw your liquidity at any time (subject to available liquidity).
+            <div className="bg-base-200 rounded p-4">
+              <h3 className="text-lg font-semibold mb-1">Dynamic Interest Rates</h3>
+              <p className="text-gray-500 text-sm">
+                APY varies based on pool utilization and borrower reputation scores.
               </p>
             </div>
-
-            <div className="pt-4">
-              <h3 className="text-xl font-semibold mb-2">Get Started</h3>
-              <p className="text-gray-400 mb-4">
-                Join the community of lenders who are earning while supporting credit access for borrowers with good
-                reputation.
+          </div>
+          {/* Right column */}
+          <div className="space-y-4 flex flex-col h-full">
+            <div className="bg-base-200 rounded p-4 flex-1">
+              <h3 className="text-lg font-semibold mb-1">Withdraw Anytime</h3>
+              <p className="text-gray-500 text-sm">
+                Your funds are not locked. Withdraw your liquidity at any time (subject to available liquidity).
               </p>
-
-              <div className="stats bg-base-200 shadow w-full">
-                <div className="stat">
-                  <div className="stat-title">Minimum Deposit</div>
-                  <div className="stat-value text-primary">0.01 ETH</div>
+            </div>
+            <div className="bg-base-200 rounded p-4 flex-1 flex flex-col justify-between">
+              <div>
+                <h3 className="text-lg font-semibold mb-1">Get Started</h3>
+                <p className="text-gray-500 text-sm mb-2">
+                  Join the community of lenders earning while supporting credit access for borrowers with good
+                  reputation.
+                </p>
+              </div>
+              <div className="flex gap-4 mt-2">
+                <div className="flex-1 bg-base-100 rounded p-3 text-center">
+                  <div className="text-sm text-gray-400">Minimum Deposit</div>
+                  <div className="font-bold text-primary text-lg">0.01 ETH</div>
                 </div>
-                <div className="stat">
-                  <div className="stat-title">Protocol Fee</div>
-                  <div className="stat-value text-primary">0.5%</div>
+                <div className="flex-1 bg-base-100 rounded p-3 text-center">
+                  <div className="text-sm text-gray-400">Protocol Fee</div>
+                  <div className="font-bold text-primary text-lg">0.5%</div>
                 </div>
               </div>
             </div>
