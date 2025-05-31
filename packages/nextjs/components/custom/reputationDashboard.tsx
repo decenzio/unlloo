@@ -37,16 +37,16 @@ export default function ReputationDashboard({
   levelProgress = 25,
   overallScore = 42,
   reputationMetrics = [
-    { label: "HIS", score: 63, color: "text-green-600", bgColor: "bg-green-100", progressColor: "#10B981" },
-    { label: "DAO", score: 18, color: "text-blue-600", bgColor: "bg-blue-100", progressColor: "#3B82F6" },
-    { label: "DEFI", score: 20, color: "text-gray-700", bgColor: "bg-gray-100", progressColor: "#6B7280" },
+    { label: "HISTORY", score: 63, color: "text-green-600", bgColor: "bg-green-100", progressColor: "#10B981" },
+    { label: "DEFI", score: 20, color: "text-gray-600", bgColor: "bg-gray-100", progressColor: "#6B7280FF" },
+    { label: "DAO", score: 18, color: "text-blue-600", bgColor: "bg-blue-100", progressColor: "#3B9FF6FF" },
     { label: "BAGS", score: 31, color: "text-amber-600", bgColor: "bg-amber-100", progressColor: "#F59E0B" },
   ],
   leaderboard = [
     { name: "Philip", score: 8.21 },
     { name: "Romi", score: 5.6 },
     { name: "Ellen", score: 3.5 },
-    { name: "Roman-24", score: 2.25, isCurrentUser: true },
+    { name: "Peter Horvath", score: 2.25, isCurrentUser: true },
   ],
 }: ReputationDashboardProps) {
   const [achievements, setAchievements] = useState<string[]>([]);
@@ -197,30 +197,46 @@ export default function ReputationDashboard({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="mb-10 bg-white rounded-xl p-5 shadow-sm border"
+        className="mb-10 bg-white rounded-xl p-6 shadow-md border border-gray-100"
       >
-        <div className="flex items-center gap-2 mb-4 text-gray-700 font-semibold">
-          <ChartBarIcon className="w-5 h-5" />
-          <h3 className="text-lg">Reputation Metrics</h3>
+        <div className="flex items-center gap-3 mb-6 text-gray-800">
+          <ChartBarIcon className="w-6 h-6 text-indigo-600" />
+          <h3 className="text-xl font-bold">Reputation Metrics</h3>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
           {reputationMetrics.map(({ label, score, color, bgColor, progressColor }) => (
-            <motion.div key={label} variants={itemVariants} className="flex flex-col items-center">
-              <div className={`w-20 h-20 ${bgColor} rounded-lg flex items-center justify-center p-2`}>
-                {/* Use CircularProgressbar directly as a JSX component instead of React.createElement */}
+            <motion.div
+              key={label}
+              variants={itemVariants}
+              whileHover={{
+                scale: 1.05,
+                transition: { duration: 0.2 },
+              }}
+              className="flex flex-col items-center bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200"
+            >
+              <div className={`w-24 h-24 ${bgColor} rounded-full flex items-center justify-center p-2.5 mb-3`}>
+                {/* @ts-ignore */}
                 <CircularProgressbar
                   value={score}
                   maxValue={100}
                   text={`${score}`}
                   styles={buildStyles({
-                    textSize: "30px",
-                    textColor: color.replace("text-", "").replace("-600", "-800").replace("-700", "-800"),
+                    textSize: "28px",
+                    textColor: color.replace("text-", "").replace("-600", "-900").replace("-700", "-900"),
                     pathColor: progressColor,
-                    trailColor: "rgba(229, 231, 235, 0.8)",
+                    trailColor: "rgba(229, 231, 235, 0.6)",
+                    strokeLinecap: "round",
+                    pathTransitionDuration: 0.5,
                   })}
                 />
               </div>
-              <div className={`mt-2 font-medium text-sm ${color}`}>{label}</div>
+              <div className="flex flex-col items-center">
+                <div className={`font-bold text-base ${color}`}>{label}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {score < 30 ? "Building" : score < 60 ? "Advancing" : "Expert"}
+                </div>
+              </div>
             </motion.div>
           ))}
         </div>
@@ -266,7 +282,7 @@ export default function ReputationDashboard({
 
       {/* Tips & Next Steps */}
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="text-center">
-        <motion.p variants={itemVariants} className="text-sm text-gray-600 max-w-md mx-auto">
+        <motion.p variants={itemVariants} className="text-xs text-gray-600 max-w-md mx-auto">
           Level up to unlock new perks, badges, and on-chain reputation power.
           <br />
           <Link href="/improve-score" className="text-indigo-600 hover:underline font-medium mt-2 inline-block">
