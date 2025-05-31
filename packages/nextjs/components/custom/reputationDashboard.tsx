@@ -70,13 +70,6 @@ function convertToReputationMetrics(reputationScore: any): ReputationMetric[] {
       bgColor: "bg-amber-100",
       progressColor: "#F59E0B",
     },
-    {
-      label: "TRUST",
-      score: reputationScore.components.networkTrust,
-      color: "text-indigo-600",
-      bgColor: "bg-indigo-100",
-      progressColor: "#6366F1",
-    },
   ];
 }
 
@@ -356,7 +349,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
               <h3 className="text-xl font-bold">Reputation Metrics</h3>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
               {derivedValues.reputationMetrics.map(({ label, score, color, bgColor, progressColor }) => (
                 <motion.div
                   key={label}
