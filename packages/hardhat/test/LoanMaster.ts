@@ -8,6 +8,7 @@ describe("LoanMaster", function () {
   let owner: HardhatEthersSigner;
   let user: HardhatEthersSigner;
   let mockUSDC: any; // Will be implemented as ERC20 token
+  let usdcTokenAddress: string;
 
   beforeEach(async () => {
     [owner, user] = await ethers.getSigners();
@@ -15,6 +16,7 @@ describe("LoanMaster", function () {
     // Deploy mock ERC20 tokens
     const MockERC20Factory = await ethers.getContractFactory("MockERC20");
     mockUSDC = await MockERC20Factory.deploy("Mock USDC", "USDC");
+    usdcTokenAddress = await mockUSDC.getAddress();
     // mockWETH = await MockERC20Factory.deploy("Mock WETH", "WETH", 18);
     // mockWBTC = await MockERC20Factory.deploy("Mock WBTC", "WBTC", 8);
 
@@ -23,7 +25,7 @@ describe("LoanMaster", function () {
     loanMaster = (await LoanMasterFactory.deploy()) as LoanMaster;
 
     // Initialize default pools for consistency across tests
-    await loanMaster.createLiquidityPool(await mockUSDC.getAddress(), 500, 1000);
+    await loanMaster.createLiquidityPool(usdcTokenAddress, 500, 1000);
     // await loanMaster.createLiquidityPool(await mockWETH.getAddress(), 300, 800);
     // await loanMaster.createLiquidityPool(await mockWBTC.getAddress(), 400, 900);
   });
@@ -34,9 +36,9 @@ describe("LoanMaster", function () {
     });
 
     it("Should have proper APR settings for each pool", async function () {
-      const usdcPool = await loanMaster.getLiquidityPool(0);
-      const wethPool = await loanMaster.getLiquidityPool(1);
-      const wbtcPool = await loanMaster.getLiquidityPool(2);
+      const usdcPool = await loanMaster.getLiquidityPoolByToken("0xF1815bd50389c46847f0Bda824eC8da914045D14");
+      const wethPool = await loanMaster.getLiquidityPoolByToken("0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590");
+      const wbtcPool = await loanMaster.getLiquidityPoolByToken("0xA0197b2044D28b08Be34d98b23c9312158Ea9A18");
 
       expect(usdcPool.depositAPR).to.equal(500);
       expect(usdcPool.borrowAPR).to.equal(1000);
@@ -58,13 +60,13 @@ describe("LoanMaster", function () {
       await mockUSDC.connect(user).approve(await loanMaster.getAddress(), depositAmount);
 
       // Make the deposit
-      await loanMaster.connect(user).addLiquidity(3, depositAmount);
+      await loanMaster.connect(user).addLiquidity(usdcTokenAddress, depositAmount);
 
       // Check user's deposit was recorded
-      expect(await loanMaster.getUserDeposit(3, await user.getAddress())).to.equal(depositAmount);
+      expect(await loanMaster.getUserDeposit(usdcTokenAddress, await user.getAddress())).to.equal(depositAmount);
 
       // Check pool liquidity increased
-      const pool = await loanMaster.getLiquidityPool(3);
+      const pool = await loanMaster.getLiquidityPoolByToken(usdcTokenAddress);
       expect(pool.liquidity).to.equal(depositAmount);
     });
 
@@ -79,8 +81,8 @@ describe("LoanMaster", function () {
       // Approve and deposit for both users
       await mockUSDC.connect(user).approve(await loanMaster.getAddress(), depositAmount);
       await mockUSDC.connect(user2).approve(await loanMaster.getAddress(), depositAmount);
-      await loanMaster.connect(user).addLiquidity(3, depositAmount);
-      await loanMaster.connect(user2).addLiquidity(3, depositAmount);
+      await loanMaster.connect(user).addLiquidity(usdcTokenAddress, depositAmount);
+      await loanMaster.connect(user2).addLiquidity(usdcTokenAddress, depositAmount);
 
       // Fast forward time to accrue interest
       await ethers.provider.send("evm_increaseTime", [30 * 24 * 60 * 60]);
@@ -90,15 +92,15 @@ describe("LoanMaster", function () {
       const balanceBefore = await mockUSDC.balanceOf(await user.getAddress());
 
       // User1 withdraws liquidity
-      await loanMaster.connect(user).removeLiquidity(3);
+      await loanMaster.connect(user).removeLiquidity(usdcTokenAddress);
 
       // Verify user1's withdrawal
       const balanceAfter = await mockUSDC.balanceOf(await user.getAddress());
       expect(balanceAfter).to.be.gt(balanceBefore);
-      expect(await loanMaster.getUserDeposit(3, await user.getAddress())).to.equal(0);
+      expect(await loanMaster.getUserDeposit(usdcTokenAddress, await user.getAddress())).to.equal(0);
 
       // Verify user2 still has their deposit
-      expect(await loanMaster.getUserDeposit(3, await user2.getAddress())).to.equal(depositAmount);
+      expect(await loanMaster.getUserDeposit(usdcTokenAddress, await user2.getAddress())).to.equal(depositAmount);
     });
   });
 
@@ -108,20 +110,19 @@ describe("LoanMaster", function () {
       const liquidityAmount = ethers.parseUnits("1000", 6); // 1000 USDC
       await mockUSDC.mint(await owner.getAddress(), liquidityAmount);
       await mockUSDC.connect(owner).approve(await loanMaster.getAddress(), liquidityAmount);
-      await loanMaster.connect(owner).addLiquidity(3, liquidityAmount);
+      await loanMaster.connect(owner).addLiquidity(usdcTokenAddress, liquidityAmount);
 
-      // Now borrow some tokens
       // Now borrow some tokens
       const borrowAmount = ethers.parseUnits("500", 6); // 500 USDC
       const balanceBefore = await mockUSDC.balanceOf(await user.getAddress());
 
-      await loanMaster.connect(user).borrow(3, borrowAmount);
+      await loanMaster.connect(user).borrow(usdcTokenAddress, borrowAmount);
 
       const balanceAfter = await mockUSDC.balanceOf(await user.getAddress());
       expect(balanceAfter - balanceBefore).to.equal(borrowAmount);
 
       // Check borrow was recorded
-      expect(await loanMaster.getUserBorrow(3, await user.getAddress())).to.equal(borrowAmount);
+      expect(await loanMaster.getUserBorrow(usdcTokenAddress, await user.getAddress())).to.equal(borrowAmount);
     });
 
     it("Should allow users to repay borrowed tokens with interest", async function () {
@@ -129,17 +130,17 @@ describe("LoanMaster", function () {
       const liquidityAmount = ethers.parseUnits("1000", 6); // 1000 USDC
       await mockUSDC.mint(await owner.getAddress(), liquidityAmount);
       await mockUSDC.connect(owner).approve(await loanMaster.getAddress(), liquidityAmount);
-      await loanMaster.connect(owner).addLiquidity(3, liquidityAmount);
+      await loanMaster.connect(owner).addLiquidity(usdcTokenAddress, liquidityAmount);
 
       // Borrow tokens first
       const initialBorrowAmount = ethers.parseUnits("500", 6); // 500 USDC
-      await loanMaster.connect(user).borrow(3, initialBorrowAmount);
+      await loanMaster.connect(user).borrow(usdcTokenAddress, initialBorrowAmount);
 
       // Fast forward time to accrue some interest (1 month)
       await ethers.provider.send("evm_increaseTime", [30 * 24 * 60 * 60]);
       await ethers.provider.send("evm_mine", []);
 
-      const borrowAmount = await loanMaster.getUserBorrow(3, await user.getAddress());
+      const borrowAmount = await loanMaster.getUserBorrow(usdcTokenAddress, await user.getAddress());
 
       // Calculate approximate interest manually for verification
       const secondsElapsed = BigInt(30 * 24 * 60 * 60);
@@ -153,10 +154,10 @@ describe("LoanMaster", function () {
 
       // Approve and repay
       await mockUSDC.connect(user).approve(await loanMaster.getAddress(), expectedRepayment * 2n);
-      await loanMaster.connect(user).repayBorrow(3);
+      await loanMaster.connect(user).repayBorrow(usdcTokenAddress);
 
       // Check borrow was cleared
-      expect(await loanMaster.getUserBorrow(3, await user.getAddress())).to.equal(0n);
+      expect(await loanMaster.getUserBorrow(usdcTokenAddress, await user.getAddress())).to.equal(0n);
     });
   });
 });
