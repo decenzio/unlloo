@@ -57,5 +57,9 @@
   },
   "engines": {
     "node": ">=20.18.3"
+  },
+  "dependencies": {
+    "framer-motion": "^12.15.0",
+    "react-circular-progressbar": "^2.2.0"
   }
 }
