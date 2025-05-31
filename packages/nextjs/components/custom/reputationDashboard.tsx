@@ -372,7 +372,9 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                 <ChartBarIcon className="w-6 h-6 text-indigo-600" />
                 <h3 className="text-lg font-medium text-gray-700">Max Borrow</h3>
               </div>
-              <div className="text-2xl font-bold text-indigo-700 mb-2">$1,500</div>
+              <div className="text-2xl font-bold text-indigo-700 mb-2">
+                $1.5 <small className="text-xs">(Alfa version limit)</small>
+              </div>
               <div className="text-sm text-gray-600">
                 Your current maximum borrow limit based on your reputation score.
               </div>
