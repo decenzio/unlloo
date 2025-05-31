@@ -5,9 +5,9 @@ import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
 // Token addresses - you would replace these with actual deployed token addresses
 export const TOKEN_ADDRESSES = {
-  USDC: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" as Address,
-  WETH: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9" as Address,
-  WBTC: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9" as Address,
+  USDC: "0xF1815bd50389c46847f0Bda824eC8da914045D14" as Address,
+  WETH: "0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590" as Address,
+  WBTC: "0xA0197b2044D28b08Be34d98b23c9312158Ea9A18" as Address,
 };
 
 // Interface for token metadata
