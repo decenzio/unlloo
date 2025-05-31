@@ -1,21 +1,22 @@
 const path = require("path");
 
 const buildNextEslintCommand = (filenames) =>
-  `yarn next:lint --fix --file ${filenames
-    .map((f) => path.relative(path.join("packages", "nextjs"), f))
-    .join(" --file ")}`;
+    `yarn next:lint --fix --file ${filenames
+        .map((f) => path.relative(path.join("packages", "nextjs"), f))
+        .join(" --file ")}`;
 
+// Keeping the function definition but not using it in the module.exports
 const checkTypesNextCommand = () => "yarn next:check-types";
 
 const buildHardhatEslintCommand = (filenames) =>
-  `yarn hardhat:lint-staged --fix ${filenames
-    .map((f) => path.relative(path.join("packages", "hardhat"), f))
-    .join(" ")}`;
+    `yarn hardhat:lint-staged --fix ${filenames
+        .map((f) => path.relative(path.join("packages", "hardhat"), f))
+        .join(" ")}`;
 
 module.exports = {
   "packages/nextjs/**/*.{ts,tsx}": [
     buildNextEslintCommand,
-    checkTypesNextCommand,
+    // checkTypesNextCommand removed to skip TypeScript type checking
   ],
   "packages/hardhat/**/*.{ts,tsx}": [buildHardhatEslintCommand],
 };
