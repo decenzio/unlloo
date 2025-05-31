@@ -16,27 +16,31 @@ export interface TokenMetadata {
   name: string;
   decimals: number;
   iconColor: string;
+  imageUrl: string;
 }
 
-// Token metadata lookup
+// Token metadata lookup with images
 const TOKEN_METADATA: Record<Address, TokenMetadata> = {
   [TOKEN_ADDRESSES.USDC]: {
     symbol: "USDC",
     name: "USD Coin",
     decimals: 6,
     iconColor: "#2775CA",
+    imageUrl: "https://assets.coingecko.com/coins/images/6319/standard/usdc.png",
   },
   [TOKEN_ADDRESSES.WETH]: {
     symbol: "WETH",
     name: "Wrapped Ether",
     decimals: 18,
     iconColor: "#627EEA",
+    imageUrl: "https://assets.coingecko.com/coins/images/2518/standard/weth.png",
   },
   [TOKEN_ADDRESSES.WBTC]: {
     symbol: "WBTC",
     name: "Wrapped Bitcoin",
     decimals: 8,
     iconColor: "#F7931A",
+    imageUrl: "https://assets.coingecko.com/coins/images/7598/small/wrapped_bitcoin_wbtc.png",
   },
 };
 
@@ -48,6 +52,7 @@ export const getTokenMetadata = (tokenAddress: Address): TokenMetadata => {
       name: "Unknown Token",
       decimals: 18,
       iconColor: "#6B7280",
+      imageUrl: "",
     }
   );
 };
