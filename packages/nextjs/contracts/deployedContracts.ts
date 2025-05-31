@@ -257,12 +257,12 @@ const deployedContracts = {
         {
           inputs: [
             {
-              internalType: "uint256",
-              name: "poolIndex",
-              type: "uint256",
+              internalType: "address",
+              name: "tokenId",
+              type: "address",
             },
           ],
-          name: "getLiquidityPool",
+          name: "getLiquidityPoolByToken",
           outputs: [
             {
               components: [
@@ -324,9 +324,9 @@ const deployedContracts = {
         {
           inputs: [
             {
-              internalType: "uint256",
-              name: "poolIndex",
-              type: "uint256",
+              internalType: "address",
+              name: "tokenId",
+              type: "address",
             },
           ],
           name: "getTotalLiquidity",
@@ -343,9 +343,9 @@ const deployedContracts = {
         {
           inputs: [
             {
-              internalType: "uint256",
-              name: "poolIndex",
-              type: "uint256",
+              internalType: "address",
+              name: "tokenId",
+              type: "address",
             },
             {
               internalType: "address",
@@ -367,9 +367,9 @@ const deployedContracts = {
         {
           inputs: [
             {
-              internalType: "uint256",
-              name: "poolIndex",
-              type: "uint256",
+              internalType: "address",
+              name: "tokenId",
+              type: "address",
             },
             {
               internalType: "address",

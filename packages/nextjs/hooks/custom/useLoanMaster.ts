@@ -16,7 +16,36 @@ export interface PoolWithIndex extends LiquidityPool {
   index: number;
 }
 
-// Utility functions (moved from LoanMasterService)
+// Token addresses - update these after deployment
+export const TOKEN_ADDRESSES = {
+  USDC: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" as Address,
+  WETH: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" as Address,
+  WBTC: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9" as Address,
+};
+
+// Token metadata mapping
+export const tokenMetadata: Record<string, { name: string; symbol: string; iconColor: string; decimals: number }> = {
+  [TOKEN_ADDRESSES.USDC]: {
+    name: "USD Coin",
+    symbol: "USDC",
+    iconColor: "#2775CA",
+    decimals: 6,
+  },
+  [TOKEN_ADDRESSES.WETH]: {
+    name: "Wrapped Ethereum",
+    symbol: "WETH",
+    iconColor: "#627EEA",
+    decimals: 18,
+  },
+  [TOKEN_ADDRESSES.WBTC]: {
+    name: "Wrapped Bitcoin",
+    symbol: "WBTC",
+    iconColor: "#F7931A",
+    decimals: 8,
+  },
+};
+
+// Utility functions
 export const formatTokenAmount = (amount: bigint, decimals: number = 18): string => {
   return (Number(amount) / Math.pow(10, decimals)).toString();
 };
@@ -34,6 +63,18 @@ export const calculateInterest = (principal: bigint, apr: bigint, timeElapsedSec
   return (principal * apr * timeElapsedSeconds) / (100n * secondsInYear);
 };
 
+// Helper function to get token metadata
+export const getTokenMetadata = (address: string) => {
+  return (
+    tokenMetadata[address] || {
+      name: "Unknown Token",
+      symbol: "UNK",
+      iconColor: "#6B7280",
+      decimals: 18,
+    }
+  );
+};
+
 const CONTRACT_NAME = "LoanMaster" as const;
 
 export const useLoanMaster = () => {
@@ -46,206 +87,66 @@ export const useLoanMaster = () => {
     functionName: "getLiquidityPoolCount",
   });
 
-  // Call hooks at the top level for each pool index (0-9)
-  const pool0 = useScaffoldReadContract({
+  // Get pool data for each known token
+  const usdcPool = useScaffoldReadContract({
     contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [0n],
+    functionName: "getLiquidityPoolByToken",
+    args: [TOKEN_ADDRESSES.USDC],
   });
 
-  const pool1 = useScaffoldReadContract({
+  const wethPool = useScaffoldReadContract({
     contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [1n],
+    functionName: "getLiquidityPoolByToken",
+    args: [TOKEN_ADDRESSES.WETH],
   });
 
-  const pool2 = useScaffoldReadContract({
+  const wbtcPool = useScaffoldReadContract({
     contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [2n],
+    functionName: "getLiquidityPoolByToken",
+    args: [TOKEN_ADDRESSES.WBTC],
   });
 
-  const pool3 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [3n],
-  });
-
-  const pool4 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [4n],
-  });
-
-  const pool5 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [5n],
-  });
-
-  const pool6 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [6n],
-  });
-
-  const pool7 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [7n],
-  });
-
-  const pool8 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [8n],
-  });
-
-  const pool9 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getLiquidityPool",
-    args: [9n],
-  });
-
-  // User deposit hooks
-  const deposit0 = useScaffoldReadContract({
+  // Get user deposits for each token
+  const usdcDeposit = useScaffoldReadContract({
     contractName: CONTRACT_NAME,
     functionName: "getUserDeposit",
-    args: [0n, address!],
+    args: [TOKEN_ADDRESSES.USDC, address!],
     watch: true,
   });
 
-  const deposit1 = useScaffoldReadContract({
+  const wethDeposit = useScaffoldReadContract({
     contractName: CONTRACT_NAME,
     functionName: "getUserDeposit",
-    args: [1n, address!],
+    args: [TOKEN_ADDRESSES.WETH, address!],
     watch: true,
   });
 
-  const deposit2 = useScaffoldReadContract({
+  const wbtcDeposit = useScaffoldReadContract({
     contractName: CONTRACT_NAME,
     functionName: "getUserDeposit",
-    args: [2n, address!],
+    args: [TOKEN_ADDRESSES.WBTC, address!],
     watch: true,
   });
 
-  const deposit3 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserDeposit",
-    args: [3n, address!],
-    watch: true,
-  });
-
-  const deposit4 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserDeposit",
-    args: [4n, address!],
-    watch: true,
-  });
-
-  const deposit5 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserDeposit",
-    args: [5n, address!],
-    watch: true,
-  });
-
-  const deposit6 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserDeposit",
-    args: [6n, address!],
-    watch: true,
-  });
-
-  const deposit7 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserDeposit",
-    args: [7n, address!],
-    watch: true,
-  });
-
-  const deposit8 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserDeposit",
-    args: [8n, address!],
-    watch: true,
-  });
-
-  const deposit9 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserDeposit",
-    args: [9n, address!],
-    watch: true,
-  });
-
-  // User borrow hooks
-  const borrow0 = useScaffoldReadContract({
+  // Get user borrows for each token
+  const usdcBorrow = useScaffoldReadContract({
     contractName: CONTRACT_NAME,
     functionName: "getUserBorrow",
-    args: [0n, address!],
+    args: [TOKEN_ADDRESSES.USDC, address!],
     watch: true,
   });
 
-  const borrow1 = useScaffoldReadContract({
+  const wethBorrow = useScaffoldReadContract({
     contractName: CONTRACT_NAME,
     functionName: "getUserBorrow",
-    args: [1n, address!],
+    args: [TOKEN_ADDRESSES.WETH, address!],
     watch: true,
   });
 
-  const borrow2 = useScaffoldReadContract({
+  const wbtcBorrow = useScaffoldReadContract({
     contractName: CONTRACT_NAME,
     functionName: "getUserBorrow",
-    args: [2n, address!],
-    watch: true,
-  });
-
-  const borrow3 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserBorrow",
-    args: [3n, address!],
-    watch: true,
-  });
-
-  const borrow4 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserBorrow",
-    args: [4n, address!],
-    watch: true,
-  });
-
-  const borrow5 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserBorrow",
-    args: [5n, address!],
-    watch: true,
-  });
-
-  const borrow6 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserBorrow",
-    args: [6n, address!],
-    watch: true,
-  });
-
-  const borrow7 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserBorrow",
-    args: [7n, address!],
-    watch: true,
-  });
-
-  const borrow8 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserBorrow",
-    args: [8n, address!],
-    watch: true,
-  });
-
-  const borrow9 = useScaffoldReadContract({
-    contractName: CONTRACT_NAME,
-    functionName: "getUserBorrow",
-    args: [9n, address!],
+    args: [TOKEN_ADDRESSES.WBTC, address!],
     watch: true,
   });
 
@@ -270,81 +171,116 @@ export const useLoanMaster = () => {
     contractName: CONTRACT_NAME,
   });
 
-  // Create arrays from individual hooks
-  const poolHooks = [pool0, pool1, pool2, pool3, pool4, pool5, pool6, pool7, pool8, pool9];
-  const depositHooks = [
-    deposit0,
-    deposit1,
-    deposit2,
-    deposit3,
-    deposit4,
-    deposit5,
-    deposit6,
-    deposit7,
-    deposit8,
-    deposit9,
-  ];
-  const borrowHooks = [borrow0, borrow1, borrow2, borrow3, borrow4, borrow5, borrow6, borrow7, borrow8, borrow9];
-
   // Process pools data
   const pools: PoolWithIndex[] = useMemo(() => {
     if (!poolCount) return [];
 
-    const actualPoolCount = Number(poolCount);
+    const poolsData = [usdcPool.data, wethPool.data, wbtcPool.data];
     const result: PoolWithIndex[] = [];
 
-    for (let i = 0; i < actualPoolCount && i < 10; i++) {
-      const poolData = poolHooks[i].data;
+    poolsData.forEach((poolData, index) => {
       if (poolData) {
         result.push({
-          index: i,
+          index,
           ...poolData,
         });
       }
-    }
+    });
 
     return result;
-  }, [poolCount, poolHooks]);
+  }, [poolCount, usdcPool.data, wethPool.data, wbtcPool.data]);
 
   // Process user positions
   const userPositions = useMemo(() => {
-    if (!poolCount || !address) {
+    if (!address) {
       return { deposits: [], borrows: [] };
     }
 
-    const actualPoolCount = Number(poolCount);
     const deposits = [];
     const borrows = [];
 
-    for (let i = 0; i < actualPoolCount && i < 10; i++) {
-      const pool = pools[i];
-      const depositAmount = depositHooks[i].data || 0n;
-      const borrowAmount = borrowHooks[i].data || 0n;
+    // Check USDC positions
+    if (usdcPool.data && usdcDeposit.data && usdcDeposit.data > 0n) {
+      deposits.push({
+        poolIndex: 0,
+        tokenAddress: TOKEN_ADDRESSES.USDC,
+        amount: usdcDeposit.data,
+        pool: { index: 0, ...usdcPool.data },
+      });
+    }
 
-      if (pool && depositAmount > 0n) {
-        deposits.push({
-          poolIndex: i,
-          amount: depositAmount,
-          pool,
-        });
-      }
+    if (usdcPool.data && usdcBorrow.data && usdcBorrow.data > 0n) {
+      borrows.push({
+        poolIndex: 0,
+        tokenAddress: TOKEN_ADDRESSES.USDC,
+        amount: usdcBorrow.data,
+        pool: { index: 0, ...usdcPool.data },
+      });
+    }
 
-      if (pool && borrowAmount > 0n) {
-        borrows.push({
-          poolIndex: i,
-          amount: borrowAmount,
-          pool,
-        });
-      }
+    // Check WETH positions
+    if (wethPool.data && wethDeposit.data && wethDeposit.data > 0n) {
+      deposits.push({
+        poolIndex: 1,
+        tokenAddress: TOKEN_ADDRESSES.WETH,
+        amount: wethDeposit.data,
+        pool: { index: 1, ...wethPool.data },
+      });
+    }
+
+    if (wethPool.data && wethBorrow.data && wethBorrow.data > 0n) {
+      borrows.push({
+        poolIndex: 1,
+        tokenAddress: TOKEN_ADDRESSES.WETH,
+        amount: wethBorrow.data,
+        pool: { index: 1, ...wethPool.data },
+      });
+    }
+
+    // Check WBTC positions
+    if (wbtcPool.data && wbtcDeposit.data && wbtcDeposit.data > 0n) {
+      deposits.push({
+        poolIndex: 2,
+        tokenAddress: TOKEN_ADDRESSES.WBTC,
+        amount: wbtcDeposit.data,
+        pool: { index: 2, ...wbtcPool.data },
+      });
+    }
+
+    if (wbtcPool.data && wbtcBorrow.data && wbtcBorrow.data > 0n) {
+      borrows.push({
+        poolIndex: 2,
+        tokenAddress: TOKEN_ADDRESSES.WBTC,
+        amount: wbtcBorrow.data,
+        pool: { index: 2, ...wbtcPool.data },
+      });
     }
 
     return { deposits, borrows };
-  }, [poolCount, address, pools, depositHooks, borrowHooks]);
+  }, [
+    address,
+    usdcPool.data,
+    wethPool.data,
+    wbtcPool.data,
+    usdcDeposit.data,
+    wethDeposit.data,
+    wbtcDeposit.data,
+    usdcBorrow.data,
+    wethBorrow.data,
+    wbtcBorrow.data,
+  ]);
+
+  // Helper function to get pool index from token address
+  const getPoolIndex = (tokenAddress: Address): number => {
+    const tokenAddresses = [TOKEN_ADDRESSES.USDC, TOKEN_ADDRESSES.WETH, TOKEN_ADDRESSES.WBTC];
+    return tokenAddresses.indexOf(tokenAddress);
+  };
 
   // Helper functions
-  const addLiquidity = async (poolIndex: number, amount: string, tokenDecimals: number = 18) => {
+  const addLiquidity = async (tokenAddress: Address, amount: string, tokenDecimals: number = 18) => {
     try {
       setIsLoading(true);
+      const poolIndex = getPoolIndex(tokenAddress);
       const amountWei = parseTokenAmount(amount, tokenDecimals);
 
       await addLiquidityAsync({
@@ -361,9 +297,10 @@ export const useLoanMaster = () => {
     }
   };
 
-  const removeLiquidity = async (poolIndex: number) => {
+  const removeLiquidity = async (tokenAddress: Address) => {
     try {
       setIsLoading(true);
+      const poolIndex = getPoolIndex(tokenAddress);
 
       await removeLiquidityAsync({
         functionName: "removeLiquidity",
@@ -379,9 +316,10 @@ export const useLoanMaster = () => {
     }
   };
 
-  const borrowToken = async (poolIndex: number, amount: string, tokenDecimals: number = 18) => {
+  const borrowToken = async (tokenAddress: Address, amount: string, tokenDecimals: number = 18) => {
     try {
       setIsLoading(true);
+      const poolIndex = getPoolIndex(tokenAddress);
       const amountWei = parseTokenAmount(amount, tokenDecimals);
 
       await borrowAsync({
@@ -398,9 +336,10 @@ export const useLoanMaster = () => {
     }
   };
 
-  const repayBorrow = async (poolIndex: number) => {
+  const repayBorrow = async (tokenAddress: Address) => {
     try {
       setIsLoading(true);
+      const poolIndex = getPoolIndex(tokenAddress);
 
       await repayBorrowAsync({
         functionName: "repayBorrow",
@@ -440,12 +379,12 @@ export const useLoanMaster = () => {
     userPositions,
 
     // Loading states
-    isLoading: isLoading || poolCountLoading || poolHooks.some(h => h.isLoading),
+    isLoading: isLoading || poolCountLoading || usdcPool.isLoading || wethPool.isLoading || wbtcPool.isLoading,
 
     // Actions
     addLiquidity,
     removeLiquidity,
-    borrow: borrowToken, // Renamed to avoid conflict with borrow hooks
+    borrow: borrowToken,
     repayBorrow,
     createLiquidityPool,
 
@@ -454,5 +393,7 @@ export const useLoanMaster = () => {
     parseTokenAmount,
     formatAPR,
     calculateInterest,
+    getTokenMetadata,
+    TOKEN_ADDRESSES,
   };
 };

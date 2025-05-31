@@ -1,41 +1,7 @@
 import React, { useMemo, useState } from "react";
+import { Address } from "viem";
 import { ArrowTrendingUpIcon, ChevronDownIcon, CogIcon } from "@heroicons/react/24/outline";
-import { useLoanMaster } from "~~/hooks/custom/useLoanMaster";
-
-// Token metadata mapping - Update these addresses after deployment
-const tokenMetadata: Record<string, { name: string; symbol: string; iconColor: string; decimals: number }> = {
-  // These will be updated with actual deployed addresses
-  "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512": {
-    name: "USD Coin",
-    symbol: "USDC",
-    iconColor: "#2775CA",
-    decimals: 6,
-  },
-  "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0": {
-    name: "Wrapped Ethereum",
-    symbol: "WETH",
-    iconColor: "#627EEA",
-    decimals: 18,
-  },
-  "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9": {
-    name: "Wrapped Bitcoin",
-    symbol: "WBTC",
-    iconColor: "#F7931A",
-    decimals: 8,
-  },
-};
-
-// Helper function to get token metadata
-const getTokenMetadata = (address: string) => {
-  return (
-    tokenMetadata[address] || {
-      name: "Unknown Token",
-      symbol: "UNK",
-      iconColor: "#6B7280",
-      decimals: 18,
-    }
-  );
-};
+import { getTokenMetadata, useLoanMaster } from "~~/hooks/custom/useLoanMaster";
 
 // Simple crypto icon component
 const CryptoIcon = ({ symbol, color }: { symbol: string; color: string }) => (
@@ -48,24 +14,23 @@ const CryptoIcon = ({ symbol, color }: { symbol: string; color: string }) => (
 );
 
 export default function BorrowDashboard() {
-  const { pools, userPositions, isLoading, borrow, repayBorrow, formatTokenAmount } = useLoanMaster();
+  const { pools, userPositions, isLoading, borrow, repayBorrow, formatTokenAmount, TOKEN_ADDRESSES } = useLoanMaster();
 
-  const [selectedPoolIndex, setSelectedPoolIndex] = useState(0);
+  const [selectedTokenAddress, setSelectedTokenAddress] = useState<Address>(TOKEN_ADDRESSES.USDC);
   const [showAssetSelector, setShowAssetSelector] = useState(false);
   const [borrowAmount, setBorrowAmount] = useState("");
   const [interestType, setInterestType] = useState<"stable" | "variable">("stable");
 
   // Transform pools data for UI
   const borrowableAssets = useMemo(() => {
-    return pools.map((pool, index) => {
+    return pools.map(pool => {
       const metadata = getTokenMetadata(pool.tokenAddress);
       return {
-        index,
+        tokenAddress: pool.tokenAddress,
         symbol: metadata.symbol,
         name: metadata.name,
         iconColor: metadata.iconColor,
         decimals: metadata.decimals,
-        tokenAddress: pool.tokenAddress,
         available: parseFloat(formatTokenAmount(pool.liquidity, metadata.decimals)),
         borrowAPR: Number(pool.borrowAPR) / 100,
         depositAPR: Number(pool.depositAPR) / 100,
@@ -77,9 +42,9 @@ export default function BorrowDashboard() {
   // Transform user borrows for UI
   const userBorrows = useMemo(() => {
     return userPositions.borrows.map(borrow => {
-      const metadata = getTokenMetadata(borrow.pool.tokenAddress);
+      const metadata = getTokenMetadata(borrow.tokenAddress);
       return {
-        poolIndex: borrow.poolIndex,
+        tokenAddress: borrow.tokenAddress,
         symbol: metadata.symbol,
         name: metadata.name,
         iconColor: metadata.iconColor,
@@ -91,7 +56,8 @@ export default function BorrowDashboard() {
     });
   }, [userPositions.borrows, formatTokenAmount]);
 
-  const selectedAsset = borrowableAssets[selectedPoolIndex] || borrowableAssets[0];
+  const selectedAsset =
+    borrowableAssets.find(asset => asset.tokenAddress === selectedTokenAddress) || borrowableAssets[0];
 
   // Calculate total borrowed value (simplified - you might want to add price feeds)
   const totalBorrowedValue = userBorrows.reduce((total, borrow) => {
@@ -105,16 +71,16 @@ export default function BorrowDashboard() {
     if (!borrowAmount || !selectedAsset) return;
 
     try {
-      await borrow(selectedAsset.index, borrowAmount, selectedAsset.decimals);
+      await borrow(selectedAsset.tokenAddress, borrowAmount, selectedAsset.decimals);
       setBorrowAmount("");
     } catch (error) {
       console.error("Borrow failed:", error);
     }
   };
 
-  const handleRepay = async (poolIndex: number) => {
+  const handleRepay = async (tokenAddress: Address) => {
     try {
-      await repayBorrow(poolIndex);
+      await repayBorrow(tokenAddress);
     } catch (error) {
       console.error("Repay failed:", error);
     }
@@ -149,7 +115,7 @@ export default function BorrowDashboard() {
           {userBorrows.length > 0 ? (
             <div className="space-y-4">
               {userBorrows.map(borrow => (
-                <div key={`${borrow.poolIndex}-${borrow.symbol}`} className="flex justify-between items-center">
+                <div key={borrow.tokenAddress} className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <CryptoIcon symbol={borrow.symbol} color={borrow.iconColor} />
                     <div>
@@ -170,7 +136,7 @@ export default function BorrowDashboard() {
                   </div>
 
                   <button
-                    onClick={() => handleRepay(borrow.poolIndex)}
+                    onClick={() => handleRepay(borrow.tokenAddress)}
                     className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
                   >
                     Repay
@@ -185,7 +151,7 @@ export default function BorrowDashboard() {
 
               <button
                 onClick={() => {
-                  userBorrows.forEach(borrow => handleRepay(borrow.poolIndex));
+                  userBorrows.forEach(borrow => handleRepay(borrow.tokenAddress));
                 }}
                 className="w-full bg-white hover:bg-gray-50 text-indigo-600 border border-indigo-200 py-2 rounded-lg font-medium transition-colors mt-2"
               >
@@ -235,10 +201,10 @@ export default function BorrowDashboard() {
                     <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
                       {borrowableAssets.map(asset => (
                         <button
-                          key={asset.index}
+                          key={asset.tokenAddress}
                           className="w-full flex items-center gap-2 p-3 hover:bg-gray-50 transition-colors"
                           onClick={() => {
-                            setSelectedPoolIndex(asset.index);
+                            setSelectedTokenAddress(asset.tokenAddress);
                             setShowAssetSelector(false);
                             setBorrowAmount("");
                           }}
@@ -271,7 +237,7 @@ export default function BorrowDashboard() {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Pool APR</span>
+                      <span className="text-gray-600">Borrow APR</span>
                       <span className="font-medium text-indigo-600">{selectedAsset.borrowAPR.toFixed(2)}%</span>
                     </div>
 
@@ -299,7 +265,9 @@ export default function BorrowDashboard() {
                         </div>
                       </div>
                       <div className="flex justify-between mt-1">
-                        <span className="text-xs text-gray-500">Pool: {selectedAsset.index}</span>
+                        <span className="text-xs text-gray-500">
+                          Token: {selectedAsset.tokenAddress.slice(0, 6)}...{selectedAsset.tokenAddress.slice(-4)}
+                        </span>
                         <button
                           onClick={handleMaxAmount}
                           className="text-xs text-indigo-600 font-medium hover:text-indigo-800"

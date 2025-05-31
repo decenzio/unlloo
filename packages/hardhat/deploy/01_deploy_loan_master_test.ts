@@ -12,7 +12,7 @@ const deployLoanMasterTest: DeployFunction = async function (hre: HardhatRuntime
   const { deploy } = hre.deployments;
 
   console.log(`\n🚀 Deploying LoanMaster Test Environment...`);
-  console.log(`📅 Date: 2025-05-31 11:13:15 UTC`);
+  console.log(`📅 Date: 2025-05-31 11:53:22 UTC`);
   console.log(`👤 Deployer: ${deployer}`);
 
   // Deploy Mock ERC20 tokens
@@ -76,7 +76,9 @@ const deployLoanMasterTest: DeployFunction = async function (hre: HardhatRuntime
 
   // Display pool information
   for (let i = 0; i < poolCount; i++) {
-    const pool = await loanMasterContract.getLiquidityPool(i);
+    // Fixed typo in function name: getLiquidityPoolByToekn -> getLiquidityPoolByToken
+    const tokenAddress = i === 0 ? mockUSDC.address : i === 1 ? mockWETH.address : mockWBTC.address;
+    const pool = await loanMasterContract.getLiquidityPoolByToken(tokenAddress);
     console.log(`   Pool ${i}:`);
     console.log(`     Token: ${pool.tokenAddress}`);
     console.log(`     Deposit APR: ${Number(pool.depositAPR) / 100}%`);
@@ -129,21 +131,15 @@ const deployLoanMasterTest: DeployFunction = async function (hre: HardhatRuntime
 
   // Display final pool states
   console.log(`\n📊 Final Pool States:`);
-  for (let i = 0; i < poolCount; i++) {
-    const pool = await loanMasterContract.getLiquidityPool(i);
-    let tokenSymbol = "";
-    let decimals = 18;
+  const tokenAddresses = [mockUSDC.address, mockWETH.address, mockWBTC.address];
+  const tokenSymbols = ["USDC", "WETH", "WBTC"];
+  const tokenDecimals = [6, 18, 8];
 
-    if (pool.tokenAddress === mockUSDC.address) {
-      tokenSymbol = "USDC";
-      decimals = 6;
-    } else if (pool.tokenAddress === mockWETH.address) {
-      tokenSymbol = "WETH";
-      decimals = 18;
-    } else if (pool.tokenAddress === mockWBTC.address) {
-      tokenSymbol = "WBTC";
-      decimals = 8;
-    }
+  for (let i = 0; i < poolCount; i++) {
+    // Fixed function call to use getLiquidityPoolByToken instead of getLiquidityPool
+    const pool = await loanMasterContract.getLiquidityPoolByToken(tokenAddresses[i]);
+    const tokenSymbol = tokenSymbols[i];
+    const decimals = tokenDecimals[i];
 
     console.log(`   Pool ${i} (${tokenSymbol}):`);
     console.log(`     Liquidity: ${hre.ethers.formatUnits(pool.liquidity, decimals)} ${tokenSymbol}`);
