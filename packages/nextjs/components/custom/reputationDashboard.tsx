@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
@@ -7,7 +7,6 @@ import { normalize } from "viem/ens";
 import { useAccount, useEnsAvatar, useEnsName } from "wagmi";
 import { ArrowUpIcon, ChartBarIcon, StarIcon, TrophyIcon, UserIcon } from "@heroicons/react/24/solid";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
-// import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth/RainbowKitCustomConnectButton";
 import { useReputationScore } from "~~/hooks/custom/useReputationScore";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
@@ -30,17 +29,32 @@ interface ReputationDashboardProps {
   leaderboard?: LeaderboardUser[];
 }
 
+// Define the structure of reputation score data
+interface ReputationScoreData {
+  overall: number;
+  riskLevel: number;
+  ens?: boolean;
+  wordId?: boolean;
+  components: {
+    transactionBehavior: number;
+    defiReputation: number;
+    daoActivity: number;
+    financialCapacity: number;
+  };
+  recommendations?: string[];
+}
+
 // Helper function to get level information based on score
-function getLevelInfo(score: number) {
+const getLevelInfo = (score: number) => {
   if (score >= 90) return { level: 5, title: "LEGENDARY", progress: 100 };
   if (score >= 70) return { level: 4, title: "EXPERT", progress: ((score - 70) / 20) * 100 };
   if (score >= 50) return { level: 3, title: "ADVANCED", progress: ((score - 50) / 20) * 100 };
   if (score >= 30) return { level: 2, title: "INTERMEDIATE", progress: ((score - 30) / 20) * 100 };
   return { level: 1, title: "NEWCOMER", progress: (score / 30) * 100 };
-}
+};
 
 // Helper function to convert reputation score to dashboard metrics
-function convertToReputationMetrics(reputationScore: any): ReputationMetric[] {
+const convertToReputationMetrics = (reputationScore: ReputationScoreData): ReputationMetric[] => {
   return [
     {
       label: "HISTORY",
@@ -71,7 +85,7 @@ function convertToReputationMetrics(reputationScore: any): ReputationMetric[] {
       progressColor: "#F59E0B",
     },
   ];
-}
+};
 
 const DEFAULT_LEADERBOARD: LeaderboardUser[] = [
   { name: "Philip", score: 8.21 },
@@ -95,11 +109,18 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
   // Use the reputation score hook
   const { reputationScore, loading, error, refetch } = useReputationScore();
 
+  // Info card state for metrics
+  const [openInfo, setOpenInfo] = useState<string | null>(null);
+
   // Generate block explorer link based on address and current network
-  const blockExplorerAddressLink = address ? getBlockExplorerAddressLink(targetNetwork, address) : undefined;
+  const blockExplorerAddressLink = useMemo(() => {
+    return address ? getBlockExplorerAddressLink(targetNetwork, address) : undefined;
+  }, [address, targetNetwork]);
 
   // Display name fallback logic
-  const displayName = ensName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Guest");
+  const displayName = useMemo(() => {
+    return ensName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Guest");
+  }, [ensName, address]);
 
   // Calculate derived values from reputation score
   const derivedValues = useMemo(() => {
@@ -132,6 +153,9 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
     };
   }, [reputationScore]);
 
+  // Extract level information for easy access
+  const { level, title: levelTitle, progress: levelProgress } = derivedValues.levelInfo;
+
   // Update leaderboard to include current user
   const updatedLeaderboard = useMemo(() => {
     if (!reputationScore || !isConnected) return leaderboard;
@@ -147,34 +171,59 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
   }, [leaderboard, reputationScore, isConnected, displayName]);
 
   // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1, delayChildren: 0.2 },
-    },
-  };
+  const containerVariants = useMemo(
+    () => ({
+      hidden: { opacity: 0 },
+      visible: {
+        opacity: 1,
+        transition: { staggerChildren: 0.1, delayChildren: 0.2 },
+      },
+    }),
+    [],
+  );
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: { type: "spring", stiffness: 100 },
-    },
-  };
-
-  // Info card state for metrics
-  const [openInfo, setOpenInfo] = useState<string | null>(null);
+  const itemVariants = useMemo(
+    () => ({
+      hidden: { y: 20, opacity: 0 },
+      visible: {
+        y: 0,
+        opacity: 1,
+        transition: { type: "spring", stiffness: 100 },
+      },
+    }),
+    [],
+  );
 
   // Info texts for each metric
-  const metricInfo: Record<string, string> = {
-    HISTORY: "Reflects your on-chain activity and longevity. The higher, the more established your address.",
-    DEFI: "Shows your engagement with DeFi protocols. Interact with DeFi to grow this score.",
-    DAO: "Measures your participation in DAOs and governance. Get involved to increase it.",
-    BAGS: "Represents your wallet diversity and asset holdings. More variety and value means a higher score.",
-  };
+  const metricInfo: Record<string, string> = useMemo(
+    () => ({
+      HISTORY: "Reflects your on-chain activity and longevity. The higher, the more established your address.",
+      DEFI: "Shows your engagement with DeFi protocols. Interact with DeFi to grow this score.",
+      DAO: "Measures your participation in DAOs and governance. Get involved to increase it.",
+      BAGS: "Represents your wallet diversity and asset holdings. More variety and value means a higher score.",
+    }),
+    [],
+  );
 
+  // Memoized click handlers
+  const handleInfoToggle = useCallback(
+    (label: string) => {
+      setOpenInfo(openInfo === label ? null : label);
+    },
+    [openInfo],
+  );
+
+  const handleInfoClose = useCallback(() => {
+    setOpenInfo(null);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    if (refetch) {
+      refetch();
+    }
+  }, [refetch]);
+
+  // @ts-ignore
   return (
     <div className="text-black w-full font-sans">
       {/* Welcome Banner */}
@@ -187,7 +236,6 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
         <div className="flex flex-wrap items-center gap-3">
           {isConnected && address ? (
             <div className="flex flex-col items-start flex-wrap">
-              {/* <div className="text-sm text-purple-600 font-small mb-1">Welcome back</div> */}
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm">
                   <BlockieAvatar address={address} size={40} ensImage={ensAvatar} />
@@ -221,19 +269,14 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
           {/* Level Number (left) */}
           <div className="w-18 h-18 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-3xl flex items-center justify-center shadow flex-shrink-0">
             {String(level).padStart(2, "0")}
-          {loading && <span className="text-xs text-indigo-600">Loading reputation...</span>}
-              {error && (
-                <button onClick={refetch} className="text-xs text-red-600 hover:text-red-800 font-medium underline">
-                  Retry
-                </button>
-              )}
-              </div>
+          </div>
+
           {/* Level Info & Progress Bar (right) */}
           <div className="flex-1 flex flex-col justify-center w-full">
             <div className="text-lg font-bold text-indigo-800">{levelTitle}</div>
             <div className="">
               <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>{levelProgress}%</span>
+                <span>{Math.round(levelProgress)}%</span>
               </div>
               <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                 <motion.div
@@ -250,7 +293,20 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             </div>
           </div>
         </div>
-        {/* </motion.div> */}
+
+        {/* Status Messages */}
+        {loading && (
+          <div className="text-center">
+            <span className="text-xs text-indigo-600">Loading reputation...</span>
+          </div>
+        )}
+        {error && (
+          <div className="text-center">
+            <button onClick={handleRetry} className="text-xs text-red-600 hover:text-red-800 font-medium underline">
+              Retry
+            </button>
+          </div>
+        )}
       </motion.div>
 
       {/* Loading State */}
@@ -265,7 +321,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
           <p className="text-red-700">Error: {error}</p>
-          <button onClick={refetch} className="mt-2 text-red-600 hover:text-red-800 font-medium underline">
+          <button onClick={handleRetry} className="mt-2 text-red-600 hover:text-red-800 font-medium underline">
             Try again
           </button>
         </div>
@@ -288,18 +344,18 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             >
               <h3 className="text-lg font-medium text-gray-700 mb-3">Overall Score</h3>
               <div className="w-32 h-32 mb-3">
-                {React.createElement(CircularProgressbar, {
-                  value: derivedValues.overallScore,
-                  maxValue: 100,
-                  text: `${derivedValues.overallScore}`,
-                  styles: buildStyles({
+                <CircularProgressbar
+                  value={derivedValues.overallScore}
+                  maxValue={100}
+                  text={`${derivedValues.overallScore}`}
+                  styles={buildStyles({
                     textSize: "28px",
                     pathColor: `rgba(101, 116, 205, ${derivedValues.overallScore / 100})`,
                     textColor: "#4338CA",
                     trailColor: "#E5E7EB",
                     pathTransitionDuration: 1,
-                  }),
-                })}
+                  })}
+                />
               </div>
               <div className="text-sm text-center text-gray-600">
                 {derivedValues.overallScore < 30
@@ -317,43 +373,12 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                 <h3 className="text-lg font-medium text-gray-700">Max Borrow</h3>
               </div>
               <div className="text-2xl font-bold text-indigo-700 mb-2">$1,500</div>
-              <div className="text-sm text-gray-600">Your current maximum borrow limit based on your reputation score.</div>
+              <div className="text-sm text-gray-600">
+                Your current maximum borrow limit based on your reputation score.
+              </div>
               <div className="mt-3 flex items-center gap-1 text-xs text-indigo-600">
                 <ArrowUpIcon className="w-4 h-4" />
                 <span>Increase your score to raise this limit</span>
-              </div>
-            </motion.div>
-
-            {/* Level Progress */}
-            <motion.div variants={itemVariants} className="flex flex-col bg-white rounded-xl p-5 shadow-sm border">
-              <div className="flex items-center gap-4 mb-3">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-2xl flex items-center justify-center shadow">
-                  {String(derivedValues.levelInfo.level).padStart(2, "0")}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 uppercase tracking-wider">Current Level</span>
-                  <div className="text-lg font-bold text-indigo-800">{derivedValues.levelInfo.title}</div>
-                </div>
-              </div>
-
-              <div className="mt-2">
-                <div className="flex justify-between text-sm text-gray-600 mb-1">
-                  <span>Progress to level {derivedValues.levelInfo.level + 1}</span>
-                  <span>{Math.round(derivedValues.levelInfo.progress)}%</span>
-                </div>
-                <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${derivedValues.levelInfo.progress}%` }}
-                    transition={{ duration: 1, ease: "easeOut" }}
-                    className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-1 text-xs text-indigo-600">
-                <ArrowUpIcon className="w-4 h-4" />
-                <span>Be more Web3 active to improve your reputation</span>
               </div>
             </motion.div>
 
@@ -403,62 +428,58 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                 <motion.div
                   key={label}
                   variants={itemVariants}
-                  //   whileHover={{
-              //     scale: 1.05,
-              //     transition: { duration: 0.2 },
-              //   }}
-              className="relative flex flex-col items-center bg-white rounded-xl p-4 shadow-sm transition-shadow duration-200"
-            >
-              <div className={`w-24 h-24 ${bgColor} rounded-full flex items-center justify-center p-2.5 mb-3`}>
-                {React.createElement(CircularProgressbar, {
-                  value: score,
-                  maxValue: 100,
-                  text: `${score}`,
-                  styles: buildStyles({
-                    textSize: "28px",
-                    textColor: color.replace("text-", "").replace("-600", "-900").replace("-700", "-900"),
-                    pathColor: progressColor,
-                    trailColor: "rgba(254, 254, 255, 0.66)",
-                    strokeLinecap: "round",
-                    pathTransitionDuration: 0.5,
-                  }),
-                })}
-              </div>
-              <div className="flex flex-col items-center">
-                <div className={`font-bold text-base ${color} flex items-center gap-1`}>
-                  {label}
-                  <button
-                    type="button"
-                    aria-label={`Info about ${label}`}
-                    onClick={() => setOpenInfo(openInfo === label ? null : label)}
-                    className="ml-1 cursor-pointer"
-                  >
-                    <svg
-                      className="w-4 h-4 text-indigo-400 transition"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      viewBox="0 0 24 24"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="16" x2="12" y2="12" />
-                      <circle cx="12" cy="8" r="1" />
-                    </svg>
-                  </button>
-                </div>
-                {/* Info Card */}
-                {openInfo === label && (
-                  <div className="absolute z-50 top-0 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 rounded-lg shadow-lg p-3 w-44 text-xs text-gray-700 animate-fade-in">
-                    <div className="font-semibold mb-1">{label}</div>
-                    <div>{metricInfo[label]}</div>
-                    <button
-                      className="block ml-auto mt-0.5 text-indigo-600 hover:underline text-xs cursor-pointer"
-                      onClick={() => setOpenInfo(null)}
-                    >
-                      Close
-                    </button>
+                  className="relative flex flex-col items-center bg-white rounded-xl p-4 shadow-sm transition-shadow duration-200"
+                >
+                  <div className={`w-24 h-24 ${bgColor} rounded-full flex items-center justify-center p-2.5 mb-3`}>
+                    <CircularProgressbar
+                      value={score}
+                      maxValue={100}
+                      text={`${score}`}
+                      styles={buildStyles({
+                        textSize: "28px",
+                        textColor: color.replace("text-", "").replace("-600", "-900").replace("-700", "-900"),
+                        pathColor: progressColor,
+                        trailColor: "rgba(254, 254, 255, 0.66)",
+                        strokeLinecap: "round",
+                        pathTransitionDuration: 0.5,
+                      })}
+                    />
                   </div>
-                )}
+                  <div className="flex flex-col items-center">
+                    <div className={`font-bold text-base ${color} flex items-center gap-1`}>
+                      {label}
+                      <button
+                        type="button"
+                        aria-label={`Info about ${label}`}
+                        onClick={() => handleInfoToggle(label)}
+                        className="ml-1 cursor-pointer"
+                      >
+                        <svg
+                          className="w-4 h-4 text-indigo-400 transition"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          viewBox="0 0 24 24"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="16" x2="12" y2="12" />
+                          <circle cx="12" cy="8" r="1" />
+                        </svg>
+                      </button>
+                    </div>
+                    {/* Info Card */}
+                    {openInfo === label && (
+                      <div className="absolute z-50 top-0 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 rounded-lg shadow-lg p-3 w-44 text-xs text-gray-700 animate-fade-in">
+                        <div className="font-semibold mb-1">{label}</div>
+                        <div>{metricInfo[label]}</div>
+                        <button
+                          className="block ml-auto mt-0.5 text-indigo-600 hover:underline text-xs cursor-pointer"
+                          onClick={handleInfoClose}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    )}
                     <div className="text-xs text-gray-500 mt-1">
                       {score < 30 ? "Building" : score < 60 ? "Advancing" : "Expert"}
                     </div>
@@ -468,7 +489,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             </div>
           </motion.div>
 
-          {/* Recommendations Section (New) */}
+          {/* Recommendations Section */}
           {reputationScore?.recommendations && reputationScore.recommendations.length > 0 && (
             <motion.div
               variants={containerVariants}

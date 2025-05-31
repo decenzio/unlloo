@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Address, formatUnits, parseUnits } from "viem";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
@@ -128,27 +128,26 @@ export function useLoanMaster() {
   const { data: loanMasterContractData } = useDeployedContractInfo("LoanMaster");
 
   // Simulate interest calculation for frontend display
-  const calculateSimulatedInterest = (
-    principal: number,
-    aprBasisPoints: number,
-    timestamp: number,
-  ): { interest: number; total: number } => {
-    const now = Date.now() / 1000; // Current time in seconds
-    const timeElapsed = now - timestamp;
-    const secondsInYear = 365 * 24 * 60 * 60;
+  const calculateSimulatedInterest = useCallback(
+    (principal: number, aprBasisPoints: number, timestamp: number): { interest: number; total: number } => {
+      const now = Date.now() / 1000; // Current time in seconds
+      const timeElapsed = now - timestamp;
+      const secondsInYear = 365 * 24 * 60 * 60;
 
-    // Convert basis points to percentage (e.g., 1000 = 10%)
-    const apr = aprBasisPoints / 10000;
+      // Convert basis points to percentage (e.g., 1000 = 10%)
+      const apr = aprBasisPoints / 10000;
 
-    // Calculate simple interest for display
-    const interest = (principal * apr * timeElapsed) / secondsInYear;
-    const total = principal + interest;
+      // Calculate simple interest for display
+      const interest = (principal * apr * timeElapsed) / secondsInYear;
+      const total = principal + interest;
 
-    return { interest, total };
-  };
+      return { interest, total };
+    },
+    [],
+  );
 
   // Get simulated APR for display (since contract has 0% borrow APR)
-  const getDisplayBorrowAPR = (tokenAddress: Address): number => {
+  const getDisplayBorrowAPR = useCallback((tokenAddress: Address): number => {
     // Return simulated APRs for frontend display
     const simulatedAPRs: Record<Address, number> = {
       [TOKEN_ADDRESSES.USDC]: 1000, // 10%
@@ -156,117 +155,130 @@ export function useLoanMaster() {
       [TOKEN_ADDRESSES.WBTC]: 900, // 9%
     };
     return simulatedAPRs[tokenAddress] || 1000;
-  };
+  }, []);
 
   // Helper function to check token balance
-  const checkTokenBalance = async (
-    tokenAddress: Address,
-    userAddress: Address,
-    requiredAmount: string,
-    decimals: number,
-  ): Promise<boolean> => {
-    try {
-      const balance = (await publicClient?.readContract({
-        address: tokenAddress,
-        abi: ERC20_ABI,
-        functionName: "balanceOf",
-        args: [userAddress],
-      })) as bigint;
+  const checkTokenBalance = useCallback(
+    async (
+      tokenAddress: Address,
+      userAddressParam: Address,
+      requiredAmount: string,
+      decimals: number,
+    ): Promise<boolean> => {
+      if (!publicClient) return false;
 
-      const requiredAmountBigInt = parseUnits(requiredAmount, decimals);
-      const hasEnough = balance >= requiredAmountBigInt;
+      try {
+        const balance = (await publicClient.readContract({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [userAddressParam],
+        })) as bigint;
 
-      console.log(`Token Balance Check:`, {
-        token: tokenAddress,
-        balance: formatUnits(balance, decimals),
-        required: requiredAmount,
-        hasEnough,
-      });
+        const requiredAmountBigInt = parseUnits(requiredAmount, decimals);
+        const hasEnough = balance >= requiredAmountBigInt;
 
-      return hasEnough;
-    } catch (error) {
-      console.error("Error checking token balance:", error);
-      return false;
-    }
-  };
+        console.log(`Token Balance Check:`, {
+          token: tokenAddress,
+          balance: formatUnits(balance, decimals),
+          required: requiredAmount,
+          hasEnough,
+        });
+
+        return hasEnough;
+      } catch (error) {
+        console.error("Error checking token balance:", error);
+        return false;
+      }
+    },
+    [publicClient],
+  );
 
   // Helper function to check token allowance
-  const checkTokenAllowance = async (
-    tokenAddress: Address,
-    owner: Address,
-    spender: Address,
-    requiredAmount: string,
-    decimals: number,
-  ): Promise<boolean> => {
-    try {
-      const allowance = (await publicClient?.readContract({
-        address: tokenAddress,
-        abi: ERC20_ABI,
-        functionName: "allowance",
-        args: [owner, spender],
-      })) as bigint;
+  const checkTokenAllowance = useCallback(
+    async (
+      tokenAddress: Address,
+      owner: Address,
+      spender: Address,
+      requiredAmount: string,
+      decimals: number,
+    ): Promise<boolean> => {
+      if (!publicClient) return false;
 
-      const requiredAmountBigInt = parseUnits(requiredAmount, decimals);
-      const hasEnoughAllowance = allowance >= requiredAmountBigInt;
+      try {
+        const allowance = (await publicClient.readContract({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: "allowance",
+          args: [owner, spender],
+        })) as bigint;
 
-      console.log(`Token Allowance Check:`, {
-        token: tokenAddress,
-        allowance: formatUnits(allowance, decimals),
-        required: requiredAmount,
-        hasEnoughAllowance,
-      });
+        const requiredAmountBigInt = parseUnits(requiredAmount, decimals);
+        const hasEnoughAllowance = allowance >= requiredAmountBigInt;
 
-      return hasEnoughAllowance;
-    } catch (error) {
-      console.error("Error checking token allowance:", error);
-      return false;
-    }
-  };
+        console.log(`Token Allowance Check:`, {
+          token: tokenAddress,
+          allowance: formatUnits(allowance, decimals),
+          required: requiredAmount,
+          hasEnoughAllowance,
+        });
+
+        return hasEnoughAllowance;
+      } catch (error) {
+        console.error("Error checking token allowance:", error);
+        return false;
+      }
+    },
+    [publicClient],
+  );
 
   // Enhanced approve function with better error handling
-  const approveToken = async (tokenAddress: Address, spenderAddress: Address, amount: string, decimals: number) => {
-    if (!walletClient || !userAddress || !publicClient) {
-      throw new Error("Wallet not connected");
-    }
-
-    try {
-      console.log(`=== Approving Token ===`);
-      console.log(`Token: ${tokenAddress}`);
-      console.log(`Spender: ${spenderAddress}`);
-      console.log(`Amount: ${amount}`);
-
-      // Check if user has enough balance
-      const hasBalance = await checkTokenBalance(tokenAddress, userAddress, amount, decimals);
-      if (!hasBalance) {
-        throw new Error(`Insufficient token balance. Required: ${amount}`);
+  const approveToken = useCallback(
+    async (tokenAddress: Address, spenderAddress: Address, amount: string, decimals: number) => {
+      if (!walletClient || !userAddress || !publicClient) {
+        throw new Error("Wallet not connected");
       }
 
-      const parsedAmount = parseUnits(amount, decimals);
-      console.log(`Parsed amount: ${parsedAmount.toString()}`);
+      try {
+        console.log(`=== Approving Token ===`);
+        console.log(`Token: ${tokenAddress}`);
+        console.log(`Spender: ${spenderAddress}`);
+        console.log(`Amount: ${amount}`);
 
-      const { request } = await publicClient.simulateContract({
-        address: tokenAddress,
-        abi: ERC20_ABI,
-        functionName: "approve",
-        args: [spenderAddress, parsedAmount],
-        account: userAddress,
-      });
+        // Check if user has enough balance
+        const hasBalance = await checkTokenBalance(tokenAddress, userAddress, amount, decimals);
+        if (!hasBalance) {
+          throw new Error(`Insufficient token balance. Required: ${amount}`);
+        }
 
-      const hash = await walletClient.writeContract(request);
-      console.log(`Approval transaction hash: ${hash}`);
+        const parsedAmount = parseUnits(amount, decimals);
+        console.log(`Parsed amount: ${parsedAmount.toString()}`);
 
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      console.log(`Approval confirmed in block: ${receipt.blockNumber}`);
+        const { request } = await publicClient.simulateContract({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [spenderAddress, parsedAmount],
+          account: userAddress,
+        });
 
-      return receipt;
-    } catch (error) {
-      console.error("Token approval failed:", error);
-      throw new Error(`Token approval failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
-  };
+        const hash = await walletClient.writeContract(request);
+        console.log(`Approval transaction hash: ${hash}`);
+
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        console.log(`Approval confirmed in block: ${receipt.blockNumber}`);
+
+        return receipt;
+      } catch (error) {
+        console.error("Token approval failed:", error);
+        throw new Error(`Token approval failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    },
+    [walletClient, userAddress, publicClient, checkTokenBalance],
+  );
 
   // Refresh data function
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     if (!loanMasterContractData?.address || !publicClient) return;
 
     try {
@@ -286,7 +298,12 @@ export function useLoanMaster() {
             abi: loanMasterContractData.abi,
             functionName: "getLiquidityPoolByToken",
             args: [tokenAddress],
-          })) as any;
+          })) as {
+            liquidity: bigint;
+            tokenAddress: Address;
+            depositAPR: bigint;
+            borrowAPR: bigint;
+          };
 
           if (poolInfo) {
             // Override the borrowAPR for display purposes
@@ -362,9 +379,9 @@ export function useLoanMaster() {
       console.error("Error refreshing data:", error);
       setError(error instanceof Error ? error.message : "Unknown error occurred");
     }
-  };
+  }, [loanMasterContractData, publicClient, userAddress, getDisplayBorrowAPR, calculateSimulatedInterest]);
 
-  // Load all pools from the contract
+  // Find this useEffect around line 386 and update it:
   useEffect(() => {
     const fetchPools = async () => {
       if (!loanMasterContractData?.address || !publicClient) return;
@@ -383,223 +400,250 @@ export function useLoanMaster() {
     };
 
     fetchPools();
-  }, [loanMasterContractData, publicClient, userAddress]);
+  }, [loanMasterContractData, publicClient, refreshData]);
 
   // Helper function to format token amounts
-  const formatTokenAmount = (amount: bigint, decimals: number) => {
+  const formatTokenAmount = useCallback((amount: bigint, decimals: number) => {
     return formatUnits(amount, decimals);
-  };
+  }, []);
 
   // Function to add liquidity to a pool
-  const addLiquidity = async (tokenAddress: Address, amount: string, decimals: number) => {
-    if (!amount || !userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
-      throw new Error("Missing required parameters or wallet not connected");
-    }
-
-    const poolIndex = pools.findIndex(pool => pool.tokenAddress === tokenAddress);
-    if (poolIndex === -1) throw new Error("Pool not found");
-
-    try {
-      console.log(`=== Adding Liquidity ===`);
-      console.log(`Token: ${tokenAddress}, Amount: ${amount}`);
-
-      // Check balance first
-      const hasBalance = await checkTokenBalance(tokenAddress, userAddress, amount, decimals);
-      if (!hasBalance) {
-        throw new Error(`Insufficient balance for ${amount} tokens`);
+  const addLiquidity = useCallback(
+    async (tokenAddress: Address, amount: string, decimals: number) => {
+      if (!amount || !userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
+        throw new Error("Missing required parameters or wallet not connected");
       }
 
-      // Approve tokens
-      await approveToken(tokenAddress, loanMasterContractData.address, amount, decimals);
+      const poolIndex = pools.findIndex(pool => pool.tokenAddress === tokenAddress);
+      if (poolIndex === -1) throw new Error("Pool not found");
 
-      // Add liquidity
-      const parsedAmount = parseUnits(amount, decimals);
-      const { request } = await publicClient.simulateContract({
-        address: loanMasterContractData.address,
-        abi: loanMasterContractData.abi,
-        functionName: "addLiquidity",
-        args: [BigInt(poolIndex), parsedAmount],
-        account: userAddress,
-      });
+      try {
+        console.log(`=== Adding Liquidity ===`);
+        console.log(`Token: ${tokenAddress}, Amount: ${amount}`);
 
-      const hash = await walletClient.writeContract(request);
-      await publicClient.waitForTransactionReceipt({ hash });
+        // Check balance first
+        const hasBalance = await checkTokenBalance(tokenAddress, userAddress, amount, decimals);
+        if (!hasBalance) {
+          throw new Error(`Insufficient balance for ${amount} tokens`);
+        }
 
-      console.log("Liquidity added successfully!");
+        // Approve tokens
+        await approveToken(tokenAddress, loanMasterContractData.address, amount, decimals);
 
-      // Refresh data after successful transaction
-      await refreshData();
-    } catch (error) {
-      console.error("Error adding liquidity:", error);
-      throw error;
-    }
-  };
+        // Add liquidity
+        const parsedAmount = parseUnits(amount, decimals);
+        const { request } = await publicClient.simulateContract({
+          address: loanMasterContractData.address,
+          abi: loanMasterContractData.abi,
+          functionName: "addLiquidity",
+          args: [BigInt(poolIndex), parsedAmount],
+          account: userAddress,
+        });
+
+        const hash = await walletClient.writeContract(request);
+        await publicClient.waitForTransactionReceipt({ hash });
+
+        console.log("Liquidity added successfully!");
+
+        // Refresh data after successful transaction
+        await refreshData();
+      } catch (error) {
+        console.error("Error adding liquidity:", error);
+        throw error;
+      }
+    },
+    [
+      pools,
+      userAddress,
+      loanMasterContractData,
+      walletClient,
+      publicClient,
+      checkTokenBalance,
+      approveToken,
+      refreshData,
+    ],
+  );
 
   // Function to remove liquidity from a pool
-  const removeLiquidity = async (tokenAddress: Address) => {
-    if (!userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
-      throw new Error("Wallet not connected");
-    }
+  const removeLiquidity = useCallback(
+    async (tokenAddress: Address) => {
+      if (!userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
+        throw new Error("Wallet not connected");
+      }
 
-    const poolIndex = pools.findIndex(pool => pool.tokenAddress === tokenAddress);
-    if (poolIndex === -1) throw new Error("Pool not found");
+      const poolIndex = pools.findIndex(pool => pool.tokenAddress === tokenAddress);
+      if (poolIndex === -1) throw new Error("Pool not found");
 
-    try {
-      console.log(`=== Removing Liquidity ===`);
-      console.log(`Token: ${tokenAddress}`);
+      try {
+        console.log(`=== Removing Liquidity ===`);
+        console.log(`Token: ${tokenAddress}`);
 
-      const { request } = await publicClient.simulateContract({
-        address: loanMasterContractData.address,
-        abi: loanMasterContractData.abi,
-        functionName: "removeLiquidity",
-        args: [BigInt(poolIndex)],
-        account: userAddress,
-      });
+        const { request } = await publicClient.simulateContract({
+          address: loanMasterContractData.address,
+          abi: loanMasterContractData.abi,
+          functionName: "removeLiquidity",
+          args: [BigInt(poolIndex)],
+          account: userAddress,
+        });
 
-      const hash = await walletClient.writeContract(request);
-      await publicClient.waitForTransactionReceipt({ hash });
+        const hash = await walletClient.writeContract(request);
+        await publicClient.waitForTransactionReceipt({ hash });
 
-      console.log("Liquidity removed successfully!");
+        console.log("Liquidity removed successfully!");
 
-      // Refresh data after successful transaction
-      await refreshData();
-    } catch (error) {
-      console.error("Error removing liquidity:", error);
-      throw error;
-    }
-  };
+        // Refresh data after successful transaction
+        await refreshData();
+      } catch (error) {
+        console.error("Error removing liquidity:", error);
+        throw error;
+      }
+    },
+    [pools, userAddress, loanMasterContractData, walletClient, publicClient, refreshData],
+  );
 
   // Function to borrow from a pool
-  const borrow = async (tokenAddress: Address, amount: string, decimals: number) => {
-    if (!amount || !userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
-      throw new Error("Missing required parameters or wallet not connected");
-    }
+  const borrow = useCallback(
+    async (tokenAddress: Address, amount: string, decimals: number) => {
+      if (!amount || !userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
+        throw new Error("Missing required parameters or wallet not connected");
+      }
 
-    const poolIndex = pools.findIndex(pool => pool.tokenAddress === tokenAddress);
-    if (poolIndex === -1) throw new Error("Pool not found");
+      const poolIndex = pools.findIndex(pool => pool.tokenAddress === tokenAddress);
+      if (poolIndex === -1) throw new Error("Pool not found");
 
-    try {
-      console.log(`=== Borrowing ===`);
-      console.log(`Token: ${tokenAddress}, Amount: ${amount}`);
+      try {
+        console.log(`=== Borrowing ===`);
+        console.log(`Token: ${tokenAddress}, Amount: ${amount}`);
 
-      const parsedAmount = parseUnits(amount, decimals);
-      const { request } = await publicClient.simulateContract({
-        address: loanMasterContractData.address,
-        abi: loanMasterContractData.abi,
-        functionName: "borrow",
-        args: [BigInt(poolIndex), parsedAmount],
-        account: userAddress,
-      });
+        const parsedAmount = parseUnits(amount, decimals);
+        const { request } = await publicClient.simulateContract({
+          address: loanMasterContractData.address,
+          abi: loanMasterContractData.abi,
+          functionName: "borrow",
+          args: [BigInt(poolIndex), parsedAmount],
+          account: userAddress,
+        });
 
-      const hash = await walletClient.writeContract(request);
-      await publicClient.waitForTransactionReceipt({ hash });
+        const hash = await walletClient.writeContract(request);
+        await publicClient.waitForTransactionReceipt({ hash });
 
-      console.log("Borrow successful!");
+        console.log("Borrow successful!");
 
-      // Refresh data after successful transaction
-      await refreshData();
-    } catch (error) {
-      console.error("Error borrowing:", error);
-      throw error;
-    }
-  };
+        // Refresh data after successful transaction
+        await refreshData();
+      } catch (error) {
+        console.error("Error borrowing:", error);
+        throw error;
+      }
+    },
+    [pools, userAddress, loanMasterContractData, walletClient, publicClient, refreshData],
+  );
 
   // Simplified repay function - only repays principal amount
-  const repayBorrow = async (tokenAddress: Address) => {
-    if (!userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
-      throw new Error("Wallet not connected");
-    }
-
-    try {
-      console.log("=== Repaying Borrow (Principal Only) ===");
-      console.log("Token Address:", tokenAddress);
-
-      // Get exact borrowed amount (principal only)
-      const borrowedAmount = (await publicClient.readContract({
-        address: loanMasterContractData.address,
-        abi: loanMasterContractData.abi,
-        functionName: "getUserBorrow",
-        args: [tokenAddress, userAddress],
-      })) as bigint;
-
-      if (borrowedAmount === 0n) {
-        throw new Error("No active borrow to repay");
+  const repayBorrow = useCallback(
+    async (tokenAddress: Address) => {
+      if (!userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
+        throw new Error("Wallet not connected");
       }
 
-      const metadata = getTokenMetadata(tokenAddress);
-      const repayAmountString = formatUnits(borrowedAmount, metadata.decimals);
+      try {
+        console.log("=== Repaying Borrow (Principal Only) ===");
+        console.log("Token Address:", tokenAddress);
 
-      console.log(`Repaying exactly: ${repayAmountString} ${metadata.symbol} (principal only)`);
+        // Get exact borrowed amount (principal only)
+        const borrowedAmount = (await publicClient.readContract({
+          address: loanMasterContractData.address,
+          abi: loanMasterContractData.abi,
+          functionName: "getUserBorrow",
+          args: [tokenAddress, userAddress],
+        })) as bigint;
 
-      // Check balance
-      const hasBalance = await checkTokenBalance(tokenAddress, userAddress, repayAmountString, metadata.decimals);
-      if (!hasBalance) {
-        throw new Error(`Insufficient balance. Need exactly: ${repayAmountString} ${metadata.symbol}`);
+        if (borrowedAmount === 0n) {
+          throw new Error("No active borrow to repay");
+        }
+
+        const metadata = getTokenMetadata(tokenAddress);
+        const repayAmountString = formatUnits(borrowedAmount, metadata.decimals);
+
+        console.log(`Repaying exactly: ${repayAmountString} ${metadata.symbol} (principal only)`);
+
+        // Check balance
+        const hasBalance = await checkTokenBalance(tokenAddress, userAddress, repayAmountString, metadata.decimals);
+        if (!hasBalance) {
+          throw new Error(`Insufficient balance. Need exactly: ${repayAmountString} ${metadata.symbol}`);
+        }
+
+        // Approve exact amount
+        await approveToken(tokenAddress, loanMasterContractData.address, repayAmountString, metadata.decimals);
+
+        // Repay
+        const { request } = await publicClient.simulateContract({
+          address: loanMasterContractData.address,
+          abi: loanMasterContractData.abi,
+          functionName: "repayBorrow",
+          args: [tokenAddress],
+          account: userAddress,
+        });
+
+        const hash = await walletClient.writeContract(request);
+        await publicClient.waitForTransactionReceipt({ hash });
+
+        console.log("Repayment successful!");
+        await refreshData();
+      } catch (error) {
+        console.error("Error repaying borrow:", error);
+        throw error;
       }
-
-      // Approve exact amount
-      await approveToken(tokenAddress, loanMasterContractData.address, repayAmountString, metadata.decimals);
-
-      // Repay
-      const { request } = await publicClient.simulateContract({
-        address: loanMasterContractData.address,
-        abi: loanMasterContractData.abi,
-        functionName: "repayBorrow",
-        args: [tokenAddress],
-        account: userAddress,
-      });
-
-      const hash = await walletClient.writeContract(request);
-      await publicClient.waitForTransactionReceipt({ hash });
-
-      console.log("Repayment successful!");
-      await refreshData();
-    } catch (error) {
-      console.error("Error repaying borrow:", error);
-      throw error;
-    }
-  };
+    },
+    [userAddress, loanMasterContractData, walletClient, publicClient, checkTokenBalance, approveToken, refreshData],
+  );
 
   // Get repayment amount for display (includes simulated interest)
-  const getDisplayRepaymentAmount = (tokenAddress: Address): { principal: string; interest: string; total: string } => {
-    const userBorrow = userPositions.borrows.find(b => b.tokenAddress === tokenAddress);
-    if (!userBorrow) {
-      return { principal: "0", interest: "0", total: "0" };
-    }
-
-    const metadata = getTokenMetadata(tokenAddress);
-    const principal = parseFloat(formatUnits(userBorrow.amount, metadata.decimals));
-    const interest = userBorrow.simulatedInterest || 0;
-    const total = userBorrow.totalOwed || principal;
-
-    return {
-      principal: principal.toFixed(6),
-      interest: interest.toFixed(6),
-      total: total.toFixed(6),
-    };
-  };
-
-  // Get actual repayment amount (only principal)
-  const getActualRepaymentAmount = async (tokenAddress: Address): Promise<string> => {
-    if (!userAddress || !loanMasterContractData?.address || !publicClient) {
-      return "0";
-    }
-
-    try {
-      const amount = (await publicClient.readContract({
-        address: loanMasterContractData.address,
-        abi: loanMasterContractData.abi,
-        functionName: "getUserBorrow",
-        args: [tokenAddress, userAddress],
-      })) as bigint;
+  const getDisplayRepaymentAmount = useCallback(
+    (tokenAddress: Address): { principal: string; interest: string; total: string } => {
+      const userBorrow = userPositions.borrows.find(b => b.tokenAddress === tokenAddress);
+      if (!userBorrow) {
+        return { principal: "0", interest: "0", total: "0" };
+      }
 
       const metadata = getTokenMetadata(tokenAddress);
-      return formatUnits(amount, metadata.decimals);
-    } catch (error) {
-      console.error("Error getting actual repayment amount:", error);
-      return "0";
-    }
-  };
+      const principal = parseFloat(formatUnits(userBorrow.amount, metadata.decimals));
+      const interest = userBorrow.simulatedInterest || 0;
+      const total = userBorrow.totalOwed || principal;
+
+      return {
+        principal: principal.toFixed(6),
+        interest: interest.toFixed(6),
+        total: total.toFixed(6),
+      };
+    },
+    [userPositions.borrows],
+  );
+
+  // Get actual repayment amount (only principal)
+  const getActualRepaymentAmount = useCallback(
+    async (tokenAddress: Address): Promise<string> => {
+      if (!userAddress || !loanMasterContractData?.address || !publicClient) {
+        return "0";
+      }
+
+      try {
+        const amount = (await publicClient.readContract({
+          address: loanMasterContractData.address,
+          abi: loanMasterContractData.abi,
+          functionName: "getUserBorrow",
+          args: [tokenAddress, userAddress],
+        })) as bigint;
+
+        const metadata = getTokenMetadata(tokenAddress);
+        return formatUnits(amount, metadata.decimals);
+      } catch (error) {
+        console.error("Error getting actual repayment amount:", error);
+        return "0";
+      }
+    },
+    [userAddress, loanMasterContractData, publicClient],
+  );
 
   return {
     pools,
