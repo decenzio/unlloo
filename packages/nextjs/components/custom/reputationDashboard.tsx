@@ -7,7 +7,7 @@ import { normalize } from "viem/ens";
 import { useAccount, useEnsAvatar, useEnsName } from "wagmi";
 import { ArrowUpIcon, ChartBarIcon, StarIcon, TrophyIcon, UserIcon } from "@heroicons/react/24/solid";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
-import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth/RainbowKitCustomConnectButton";
+// import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth/RainbowKitCustomConnectButton";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
 
@@ -37,10 +37,34 @@ interface ReputationDashboardProps {
 
 // Default values outside component to prevent recreation on each render
 const DEFAULT_REPUTATION_METRICS: ReputationMetric[] = [
-  { label: "HISTORY", score: 63, color: "text-green-600", bgColor: "bg-green-100", progressColor: "#10B981" },
-  { label: "DEFI", score: 20, color: "text-gray-600", bgColor: "bg-gray-100", progressColor: "#6B7280FF" },
-  { label: "DAO", score: 18, color: "text-blue-600", bgColor: "bg-blue-100", progressColor: "#3B9FF6FF" },
-  { label: "BAGS", score: 31, color: "text-amber-600", bgColor: "bg-amber-100", progressColor: "#F59E0B" },
+  {
+    label: "HISTORY",
+    score: 63,
+    color: "text-blue-700",
+    bgColor: "bg-blue-100",
+    progressColor: "#3B82F6", // blue-500
+  },
+  {
+    label: "DEFI",
+    score: 20,
+    color: "text-purple-700",
+    bgColor: "bg-purple-100",
+    progressColor: "#8B5CF6", // purple-500
+  },
+  {
+    label: "DAO",
+    score: 18,
+    color: "text-green-700",
+    bgColor: "bg-green-100",
+    progressColor: "#22C55E", // green-500
+  },
+  {
+    label: "BAGS",
+    score: 31,
+    color: "text-amber-700",
+    bgColor: "bg-amber-100",
+    progressColor: "#F59E42", // amber-500
+  },
 ];
 
 const DEFAULT_LEADERBOARD: LeaderboardUser[] = [
@@ -105,22 +129,34 @@ export default function ReputationDashboard({
 
   return (
     <div className="text-black w-full font-sans">
-      {/* Welcome Banner - Improved */}
+      {/* Welcome Banner */}
       <motion.div
         initial={{ x: -50, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-800 rounded-xl px-6 py-5 mb-8 shadow-sm"
+        className="w-full flex flex-col justify-between gap-2 bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-800 rounded-xl px-6 py-5 mb-4 shadow-sm"
       >
         <div className="flex flex-wrap items-center gap-3">
           {isConnected && address ? (
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm">
-                <BlockieAvatar address={address} size={40} ensImage={ensAvatar} />
-              </div>
-              <div className="flex flex-col">
-                <div className="text-sm text-purple-600 font-medium">Welcome back</div>
-                <div className="text-xl font-bold text-indigo-700">{displayName}</div>
+            <div className="flex flex-col items-start flex-wrap">
+              {/* <div className="text-sm text-purple-600 font-small mb-1">Welcome back</div> */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm">
+                  <BlockieAvatar address={address} size={40} ensImage={ensAvatar} />
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                  <div className="text-3xl font-bold text-indigo-700">{displayName}</div>
+                  {blockExplorerAddressLink && (
+                    <a
+                      href={blockExplorerAddressLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline underline-offset-2 ml-2"
+                    >
+                      View on Explorer
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
@@ -132,11 +168,11 @@ export default function ReputationDashboard({
             </div>
           )}
         </div>
-
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           {!isConnected ? (
             <RainbowKitCustomConnectButton />
-          ) : (
+          )
+		   : (
             <div className="flex items-center gap-2">
               <a
                 href={blockExplorerAddressLink}
@@ -147,8 +183,43 @@ export default function ReputationDashboard({
                 View on Explorer
               </a>
             </div>
-          )}
+          )
+		  }
+        </div> */}
+
+        {/* Level Progress - now its own full-width section */}
+        {/* <motion.div
+        variants={itemVariants}
+        className="w-full flex flex-col bg-white rounded-xl p-5 shadow-sm border mb-8"
+		> */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-stretch gap-6 mb-3 w-full">
+          {/* Level Number (left) */}
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-3xl flex items-center justify-center shadow flex-shrink-0">
+            {String(level).padStart(2, "0")}
+          </div>
+          {/* Level Info & Progress Bar (right) */}
+          <div className="flex-1 flex flex-col justify-center w-full">
+            <div className="text-lg font-bold text-indigo-800">{levelTitle}</div>
+            <div className="">
+              <div className="flex justify-between text-sm text-gray-600 mb-1">
+                <span>{levelProgress}%</span>
+              </div>
+              <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${levelProgress}%` }}
+                  transition={{ duration: 1, ease: "easeOut" }}
+                  className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full"
+                />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-1 text-xs text-indigo-600">
+              <ArrowUpIcon className="w-4 h-4" />
+              <span>Be more Web3 active to improve your reputation</span>
+            </div>
+          </div>
         </div>
+        {/* </motion.div> */}
       </motion.div>
 
       {/* Overall Score & Level Section */}
@@ -156,7 +227,7 @@ export default function ReputationDashboard({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10"
+        className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-5"
       >
         {/* Overall Score */}
         <motion.div
@@ -187,36 +258,17 @@ export default function ReputationDashboard({
           </div>
         </motion.div>
 
-        {/* Level Progress */}
+        {/* Max Borrow */}
         <motion.div variants={itemVariants} className="flex flex-col bg-white rounded-xl p-5 shadow-sm border">
           <div className="flex items-center gap-4 mb-3">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-2xl flex items-center justify-center shadow">
-              {String(level).padStart(2, "0")}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs text-gray-500 uppercase tracking-wider">Current Level</span>
-              <div className="text-lg font-bold text-indigo-800">{levelTitle}</div>
-            </div>
+            <ChartBarIcon className="w-6 h-6 text-indigo-600" />
+            <h3 className="text-lg font-medium text-gray-700">Max Borrow</h3>
           </div>
-
-          <div className="mt-2">
-            <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>Progress to level {level + 1}</span>
-              <span>{levelProgress}%</span>
-            </div>
-            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${levelProgress}%` }}
-                transition={{ duration: 1, ease: "easeOut" }}
-                className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full"
-              />
-            </div>
-          </div>
-
+          <div className="text-2xl font-bold text-indigo-700 mb-2">$1,500</div>
+          <div className="text-sm text-gray-600">Your current maximum borrow limit based on your reputation score.</div>
           <div className="mt-3 flex items-center gap-1 text-xs text-indigo-600">
             <ArrowUpIcon className="w-4 h-4" />
-            <span>Be more Web3 active to improve your reputation</span>
+            <span>Increase your score to raise this limit</span>
           </div>
         </motion.div>
 
@@ -254,7 +306,7 @@ export default function ReputationDashboard({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="mb-10 bg-white rounded-xl p-6 shadow-md border border-gray-100"
+        className="mb-5 bg-white rounded-xl p-6 shadow-md border border-gray-100"
       >
         <div className="flex items-center gap-3 mb-6 text-gray-800">
           <ChartBarIcon className="w-6 h-6 text-indigo-600" />
@@ -281,7 +333,7 @@ export default function ReputationDashboard({
                     textSize: "28px",
                     textColor: color.replace("text-", "").replace("-600", "-900").replace("-700", "-900"),
                     pathColor: progressColor,
-                    trailColor: "rgba(229, 231, 235, 0.6)",
+                    trailColor: "rgba(254, 254, 255, 0.66)",
                     strokeLinecap: "round",
                     pathTransitionDuration: 0.5,
                   }),
