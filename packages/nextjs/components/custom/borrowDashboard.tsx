@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowTrendingUpIcon, ChevronDownIcon, CogIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import { ArrowTrendingUpIcon, ChevronDownIcon, CogIcon } from "@heroicons/react/24/outline";
 
 // Mock data for assets with inline SVG icons instead of URLs
 const borrowableAssets = [
@@ -57,19 +57,9 @@ const CryptoIcon = ({ symbol, color }: { symbol: string; color: string }) => (
 export default function BorrowDashboard() {
   const [selectedAsset, setSelectedAsset] = useState(borrowableAssets[0]);
   const [showAssetSelector, setShowAssetSelector] = useState(false);
-  const currentDatetime = "2025-05-31 01:17:14";
 
   return (
-    <div className="flex flex-col items-center w-full">
-      {/* Header */}
-      <div className="w-full flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Credit Market</h2>
-        <div className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-          <ShieldCheckIcon className="h-3.5 w-3.5" />
-          Health Factor: {userBorrows.length > 0 ? "1.85" : "∞"}
-        </div>
-      </div>
-
+    <div className="flex flex-col items-center w-full bg-secondary">
       {/* Your Borrows Section */}
       <div className="w-full bg-base-100 rounded-xl border border-gray-100 shadow-sm mb-6">
         <div className="p-4 border-b border-gray-100">
@@ -227,12 +217,6 @@ export default function BorrowDashboard() {
             </button>
           </div>
         </div>
-      </div>
-
-      <div className="mt-4 text-center">
-        <p className="text-xs text-gray-500">
-          Last updated: <time dateTime={currentDatetime}>{currentDatetime}</time>
-        </p>
       </div>
     </div>
   );

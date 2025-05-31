@@ -31,7 +31,7 @@ interface ReputationDashboardProps {
 }
 
 export default function ReputationDashboard({
-  username = "Roman-24",
+  username = "Romi",
   level = 2,
   levelTitle = "NEWCOMER",
   levelProgress = 25,
@@ -77,9 +77,6 @@ export default function ReputationDashboard({
     },
   };
 
-  // Current date for the dashboard
-  const currentDate = "2025-05-31 01:26:23"; // Using the provided date
-
   return (
     <div className="text-black w-full font-sans">
       {/* Welcome Banner with Date */}
@@ -94,11 +91,6 @@ export default function ReputationDashboard({
           <h2 className="text-xl font-semibold">
             Welcome, <span className="font-bold text-indigo-700">{username}</span>!
           </h2>
-        </div>
-        <div className="text-sm text-purple-700 md:text-right">
-          <div>
-            Last updated: <time dateTime={currentDate}>{currentDate}</time>
-          </div>
         </div>
       </motion.div>
 
@@ -154,7 +146,6 @@ export default function ReputationDashboard({
           <div className="mt-2">
             <div className="flex justify-between text-sm text-gray-600 mb-1">
               <span>Progress to level {level + 1}</span>
-              <span>{levelProgress}%</span>
             </div>
             <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
               <motion.div
@@ -168,7 +159,7 @@ export default function ReputationDashboard({
 
           <div className="mt-3 flex items-center gap-1 text-xs text-indigo-600">
             <ArrowUpIcon className="w-4 h-4" />
-            <span>{100 - levelProgress} XP needed for next level</span>
+            <span>Be more Web3 active to improve your reputation</span>
           </div>
         </motion.div>
 
@@ -202,7 +193,12 @@ export default function ReputationDashboard({
       </motion.div>
 
       {/* Reputation Metrics */}
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="mb-10">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="mb-10 bg-white rounded-xl p-5 shadow-sm border"
+      >
         <div className="flex items-center gap-2 mb-4 text-gray-700 font-semibold">
           <ChartBarIcon className="w-5 h-5" />
           <h3 className="text-lg">Reputation Metrics</h3>
