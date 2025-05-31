@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
@@ -127,6 +127,17 @@ export default function ReputationDashboard({
     },
   };
 
+  // Info card state for metrics
+  const [openInfo, setOpenInfo] = useState<string | null>(null);
+
+  // Info texts for each metric
+  const metricInfo: Record<string, string> = {
+    HISTORY: "Reflects your on-chain activity and longevity. The higher, the more established your address.",
+    DEFI: "Shows your engagement with DeFi protocols. Interact with DeFi to grow this score.",
+    DAO: "Measures your participation in DAOs and governance. Get involved to increase it.",
+    BAGS: "Represents your wallet diversity and asset holdings. More variety and value means a higher score.",
+  };
+
   return (
     <div className="text-black w-full font-sans">
       {/* Welcome Banner */}
@@ -168,33 +179,10 @@ export default function ReputationDashboard({
             </div>
           )}
         </div>
-        {/* <div className="flex items-center gap-2">
-          {!isConnected ? (
-            <RainbowKitCustomConnectButton />
-          )
-		   : (
-            <div className="flex items-center gap-2">
-              <a
-                href={blockExplorerAddressLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline underline-offset-2"
-              >
-                View on Explorer
-              </a>
-            </div>
-          )
-		  }
-        </div> */}
 
-        {/* Level Progress - now its own full-width section */}
-        {/* <motion.div
-        variants={itemVariants}
-        className="w-full flex flex-col bg-white rounded-xl p-5 shadow-sm border mb-8"
-		> */}
         <div className="flex flex-col sm:flex-row items-center sm:items-stretch gap-6 mb-3 w-full">
           {/* Level Number (left) */}
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-3xl flex items-center justify-center shadow flex-shrink-0">
+          <div className="w-18 h-18 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-3xl flex items-center justify-center shadow flex-shrink-0">
             {String(level).padStart(2, "0")}
           </div>
           {/* Level Info & Progress Bar (right) */}
@@ -318,11 +306,11 @@ export default function ReputationDashboard({
             <motion.div
               key={label}
               variants={itemVariants}
-              whileHover={{
-                scale: 1.05,
-                transition: { duration: 0.2 },
-              }}
-              className="flex flex-col items-center bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200"
+              //   whileHover={{
+              //     scale: 1.05,
+              //     transition: { duration: 0.2 },
+              //   }}
+              className="relative flex flex-col items-center bg-white rounded-xl p-4 shadow-sm transition-shadow duration-200"
             >
               <div className={`w-24 h-24 ${bgColor} rounded-full flex items-center justify-center p-2.5 mb-3`}>
                 {React.createElement(CircularProgressbar, {
@@ -340,7 +328,40 @@ export default function ReputationDashboard({
                 })}
               </div>
               <div className="flex flex-col items-center">
-                <div className={`font-bold text-base ${color}`}>{label}</div>
+                <div className={`font-bold text-base ${color} flex items-center gap-1`}>
+                  {label}
+                  <button
+                    type="button"
+                    aria-label={`Info about ${label}`}
+                    onClick={() => setOpenInfo(openInfo === label ? null : label)}
+                    className="ml-1 cursor-pointer"
+                  >
+                    <svg
+                      className="w-4 h-4 text-indigo-400 transition"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      viewBox="0 0 24 24"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <circle cx="12" cy="8" r="1" />
+                    </svg>
+                  </button>
+                </div>
+                {/* Info Card */}
+                {openInfo === label && (
+                  <div className="absolute z-50 top-0 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 rounded-lg shadow-lg p-3 w-44 text-xs text-gray-700 animate-fade-in">
+                    <div className="font-semibold mb-1">{label}</div>
+                    <div>{metricInfo[label]}</div>
+                    <button
+                      className="block ml-auto mt-0.5 text-indigo-600 hover:underline text-xs cursor-pointer"
+                      onClick={() => setOpenInfo(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
                 <div className="text-xs text-gray-500 mt-1">
                   {score < 30 ? "Building" : score < 60 ? "Advancing" : "Expert"}
                 </div>

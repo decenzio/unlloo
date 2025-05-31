@@ -9,8 +9,8 @@ const Home: NextPage = () => {
       <div className="text-center mb-12">
         <h1 className="text-3xl font-bold">Unlloo protocol</h1>
         <p className="text-g mt-3 max-w-xl mx-auto">
-          We&#39;re not just another DeFi reputation score. Here, you level up, earn badges, evolve your avatar, and
-          build an on-chain identity you&#39;ll actually be proud of.
+          We&#39;re not just a DeFi reputation score. Here, you level up, get achivements and build an on-chain identity
+          you&#39;ll actually be proud of.
         </p>
       </div>
 
