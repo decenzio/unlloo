@@ -407,11 +407,11 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             {/* Max Borrow */}
             <motion.div variants={itemVariants} className="flex flex-col bg-white rounded-xl p-5 shadow-sm border">
               <div className="flex items-center gap-2 mb-3">
-                <CurrencyDollarIcon className="w-5 h-5 text-indigo-600" />
-                <h3 className="text-lg font-medium text-gray-700">Max Borrow</h3>
+                <CurrencyDollarIcon className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                <span className="text-lg font-medium text-gray-700 flex items-center">Max Borrow</span>
               </div>
-              <div className="text-2xl font-bold text-indigo-700 mb-2">
-                $1.5 <small className="text-xs">(Alfa version limit)</small>
+              <div className="text-2xl font-bold text-indigo-700 mb-1">
+                $1.5 <small className="text-xs text-gray-400">(Alfa version limit)</small>
               </div>
               <div className="text-sm text-gray-600">
                 Your current maximum borrow limit based on your reputation score.
@@ -425,8 +425,8 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             {/* Achievements section */}
             <motion.div variants={itemVariants} className="bg-white rounded-xl p-5 shadow-sm border">
               <div className="flex items-center gap-2 mb-4 text-amber-600 font-semibold">
-                <TrophyIcon className="w-5 h-5" />
-                <h3 className="text-lg">Achievements</h3>
+                <TrophyIcon className="w-5 h-5 flex-shrink-0" />
+                <span className="text-lg flex items-center">Achievements</span>
               </div>
 
               <ul className="space-y-3">
@@ -484,9 +484,9 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             animate="visible"
             className="mb-5 bg-white rounded-xl p-6 shadow-md border border-gray-100"
           >
-            <div className="flex items-center gap-3 mb-6 text-gray-800">
-              <ChartBarIcon className="w-6 h-6 text-indigo-600" />
-              <h3 className="text-xl font-bold">Reputation Metrics</h3>
+            <div className="flex items-center gap-2 mb-6 text-gray-800">
+              <ChartBarIcon className="w-6 h-6 text-indigo-600 flex-shrink-0" />
+              <span className="text-xl font-bold flex items-center">Reputation Metrics</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
@@ -563,9 +563,9 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
               animate="visible"
               className="mb-10 bg-white rounded-xl p-6 shadow-md border border-gray-100"
             >
-              <div className="flex items-center gap-3 mb-4 text-blue-600 font-semibold">
-                <MapIcon className="w-6 h-6" />
-                <h3 className="text-xl font-bold text-gray-800">Your Quests</h3>
+              <div className="flex items-center gap-2 mb-4 text-blue-600 font-semibold">
+                <MapIcon className="w-5 h-5 flex-shrink-0" />
+                <span className="text-xl font-bold text-gray-800 flex items-center">Your Quests</span>
               </div>
               <ul className="space-y-3">
                 {reputationScore.recommendations.map((recommendation, index) => (
@@ -584,7 +584,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             </motion.div>
           )}
 
-          {/* Leaderboard section */}
+          {/* Super Heroes Leaderboard */}
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -592,8 +592,8 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             className="bg-white border rounded-xl p-5 shadow-sm mb-8"
           >
             <div className="flex items-center gap-2 mb-4 text-indigo-600 font-semibold">
-              <StarIcon className="w-5 h-5" />
-              <h3 className="text-lg">Super Heroes Leaderboard</h3>
+              <StarIcon className="w-5 h-5 flex-shrink-0" />
+              <span className="text-lg flex items-center">Super Heroes Leaderboard</span>
             </div>
             <ol className="text-sm text-gray-700 space-y-3">
               {updatedLeaderboard.map((user, index) => (
