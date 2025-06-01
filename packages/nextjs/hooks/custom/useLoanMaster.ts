@@ -3,11 +3,11 @@ import { Address, formatUnits, parseUnits } from "viem";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
-// Token addresses - you would replace these with actual deployed token addresses
+// Token addresses - normalized to lowercase
 export const TOKEN_ADDRESSES = {
-  USDC: "0xF1815bd50389c46847f0Bda824eC8da914045D14" as Address,
-  WETH: "0x2F6F07CDcf3588944Bf4C42aC74ff24bF56e7590" as Address,
-  WBTC: "0xA0197b2044D28b08Be34d98b23c9312158Ea9A18" as Address,
+  USDC: "0xf1815bd50389c46847f0bda824ec8da914045d14" as Address,
+  WETH: "0x2f6f07cdcf3588944bf4c42ac74ff24bf56e7590" as Address,
+  WBTC: "0xa0197b2044d28b08be34d98b23c9312158ea9a18" as Address,
   UNLOO: "0x3084ae7cdb722689a47d41783507878b564f3b67" as Address,
 };
 
@@ -20,34 +20,34 @@ export interface TokenMetadata {
   imageUrl: string;
 }
 
-// Token metadata lookup with images
-const TOKEN_METADATA: Record<Address, TokenMetadata> = {
-  [TOKEN_ADDRESSES.USDC]: {
+// Token metadata lookup with normalized addresses
+const TOKEN_METADATA: Record<string, TokenMetadata> = {
+  [TOKEN_ADDRESSES.USDC.toLowerCase()]: {
     symbol: "USDC",
     name: "USD Coin",
     decimals: 6,
     iconColor: "#2775CA",
     imageUrl: "https://assets.coingecko.com/coins/images/6319/standard/usdc.png",
   },
-  [TOKEN_ADDRESSES.WETH]: {
+  [TOKEN_ADDRESSES.WETH.toLowerCase()]: {
     symbol: "WETH",
     name: "Wrapped Ether",
     decimals: 18,
     iconColor: "#627EEA",
     imageUrl: "https://assets.coingecko.com/coins/images/2518/standard/weth.png",
   },
-  [TOKEN_ADDRESSES.WBTC]: {
+  [TOKEN_ADDRESSES.WBTC.toLowerCase()]: {
     symbol: "WBTC",
     name: "Wrapped Bitcoin",
     decimals: 8,
     iconColor: "#F7931A",
-    imageUrl: "https://assets.coingecko.com/coins/images/40143/standard/cbbtc.webp?1726136727",
+    imageUrl: "https://assets.coingecko.com/coins/images/7598/small/wrapped_bitcoin_wbtc.png",
   },
-  [TOKEN_ADDRESSES.UNLOO]: {
+  [TOKEN_ADDRESSES.UNLOO.toLowerCase()]: {
     symbol: "UNLOO",
     name: "Unlloo Protocol",
     decimals: 18,
-    iconColor: "#6B7280",
+    iconColor: "#8B5CF6",
     imageUrl:
       "https://fcljjsnuzjacwqgiqiib.supabase.co/storage/v1/object/public/token_images/images/312a9958-4e00-46dc-a699-01f48f0eb4ec.jpg",
   },
@@ -55,15 +55,29 @@ const TOKEN_METADATA: Record<Address, TokenMetadata> = {
 
 // Export the utility function to get token metadata
 export const getTokenMetadata = (tokenAddress: Address): TokenMetadata => {
-  return (
-    TOKEN_METADATA[tokenAddress] || {
-      symbol: "UNK",
-      name: "Unknown Token",
-      decimals: 18,
-      iconColor: "#6B7280",
-      imageUrl: "",
-    }
-  );
+  const normalizedAddress = tokenAddress.toLowerCase();
+
+  console.log(`[getTokenMetadata] Looking up metadata for: ${tokenAddress}`);
+  console.log(`[getTokenMetadata] Normalized to: ${normalizedAddress}`);
+  console.log(`[getTokenMetadata] Available keys:`, Object.keys(TOKEN_METADATA));
+  console.log(`[getTokenMetadata] UNLOO key:`, TOKEN_ADDRESSES.UNLOO.toLowerCase());
+
+  const metadata = TOKEN_METADATA[normalizedAddress];
+
+  if (metadata) {
+    console.log(`[getTokenMetadata] Found metadata for ${normalizedAddress}:`, metadata);
+    return metadata;
+  }
+
+  console.log(`[getTokenMetadata] No metadata found for ${normalizedAddress}, returning fallback`);
+
+  return {
+    symbol: "UNK",
+    name: "Unknown Token",
+    decimals: 18,
+    iconColor: "#6B7280",
+    imageUrl: "",
+  };
 };
 
 // Pool data structure from contract
@@ -138,20 +152,19 @@ export function useLoanMaster() {
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
 
-  // Get the LoanMaster contract info
-  const { data: loanMasterContractData } = useDeployedContractInfo("LoanMaster");
+  // Get the LoanMaster contract info - Fixed deprecation warning
+  const { data: loanMasterContractData } = useDeployedContractInfo({
+    contractName: "LoanMaster",
+  });
 
   // Simulate interest calculation for frontend display
   const calculateSimulatedInterest = useCallback(
     (principal: number, aprBasisPoints: number, timestamp: number): { interest: number; total: number } => {
-      const now = Date.now() / 1000; // Current time in seconds
+      const now = Date.now() / 1000;
       const timeElapsed = now - timestamp;
       const secondsInYear = 365 * 24 * 60 * 60;
 
-      // Convert basis points to percentage (e.g., 1000 = 10%)
       const apr = aprBasisPoints / 10000;
-
-      // Calculate simple interest for display
       const interest = (principal * apr * timeElapsed) / secondsInYear;
       const total = principal + interest;
 
@@ -167,7 +180,7 @@ export function useLoanMaster() {
       [TOKEN_ADDRESSES.USDC]: 1000, // 10%
       [TOKEN_ADDRESSES.WETH]: 800, // 8%
       [TOKEN_ADDRESSES.WBTC]: 900, // 9%
-      [TOKEN_ADDRESSES.UNLOO]: 0, // 7.5%
+      [TOKEN_ADDRESSES.UNLOO]: 750, // 7.5% - Added UNLOO APR
     };
     return simulatedAPRs[tokenAddress] || 1000;
   }, []);
