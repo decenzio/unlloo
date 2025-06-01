@@ -5,11 +5,23 @@ import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
 import { normalize } from "viem/ens";
 import { useAccount, useEnsAvatar, useEnsName } from "wagmi";
-import { ArrowUpIcon, ChartBarIcon, StarIcon, TrophyIcon, UserIcon } from "@heroicons/react/24/solid";
+import {
+  ArrowUpIcon,
+  ChartBarIcon,
+  CurrencyDollarIcon,
+  MapIcon,
+  SparklesIcon,
+  StarIcon,
+  TrophyIcon,
+  UserIcon,
+} from "@heroicons/react/24/solid";
+import { CheckCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useReputationScore } from "~~/hooks/custom/useReputationScore";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
+
+// import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
 
 interface ReputationMetric {
   label: string;
@@ -57,7 +69,7 @@ const getLevelInfo = (score: number) => {
 const convertToReputationMetrics = (reputationScore: ReputationScoreData): ReputationMetric[] => {
   return [
     {
-      label: "ONCHIN ACTIVITY",
+      label: "Onchain Activity",
       score: reputationScore.components.transactionBehavior,
       color: "text-green-600",
       bgColor: "bg-green-100",
@@ -71,7 +83,7 @@ const convertToReputationMetrics = (reputationScore: ReputationScoreData): Reput
       progressColor: "#3B9FF6FF",
     },
     {
-      label: "GOVERNANCE",
+      label: "Governance",
       score: reputationScore.components.daoActivity,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
@@ -80,9 +92,23 @@ const convertToReputationMetrics = (reputationScore: ReputationScoreData): Reput
     {
       label: "NFTs",
       score: reputationScore.components.financialCapacity,
-      color: "text-amber-600",
-      bgColor: "bg-amber-100",
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100",
       progressColor: "#F59E0B",
+    },
+    {
+      label: "POAPs",
+      score: 0, // Placeholder for POAPs, can be replaced with actual data
+      color: "text-pink-600",
+      bgColor: "bg-pink-100",
+      progressColor: "#EC4899",
+    },
+    {
+      label: "Connections",
+      score: 0, // Placeholder for connections, can be replaced with actual data
+      color: "text-orange-600",
+      bgColor: "bg-orange-100",
+      progressColor: "#F97316",
     },
   ];
 };
@@ -90,6 +116,13 @@ const convertToReputationMetrics = (reputationScore: ReputationScoreData): Reput
 const DEFAULT_LEADERBOARD: LeaderboardUser[] = [
   { name: "Philip", score: 8.21 },
   { name: "Ellen", score: 3.5 },
+];
+
+// Define your 3 specific achievements
+const SPECIFIC_ACHIEVEMENTS = [
+  { key: "ens", label: "ENS Domain Owner" },
+  { key: "wordId", label: "WorldID Verified" },
+  { key: "defi", label: "DeFi Enthusiast" },
 ];
 
 export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD }: ReputationDashboardProps) {
@@ -197,10 +230,15 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
   // Info texts for each metric
   const metricInfo: Record<string, string> = useMemo(
     () => ({
-      HISTORY: "Reflects your on-chain activity and longevity. The higher, the more established your address.",
-      DEFI: "Shows your engagement with DeFi protocols. Interact with DeFi to grow this score.",
-      DAO: "Measures your participation in DAOs and governance. Get involved to increase it.",
-      BAGS: "Represents your wallet diversity and asset holdings. More variety and value means a higher score.",
+      "Onchain Activity":
+        "Reflects your on-chain activity and longevity. The higher, the more established your address.",
+      NFTs: "Shows your engagement with DeFi protocols. Interact with DeFi to grow this score.",
+      DEFI: "Measures your participation in DAOs and governance. Get involved to increase it.",
+      Governance: "Represents your wallet diversity and asset holdings. More variety and value means a higher score.",
+      POAPs:
+        "COMING SOON --- Counts your POAPs, showcasing your participation in events and communities. Collect more to boost this.",
+      Connections:
+        "COMING SOON --- Indicates your network strength and connections with other users. Engage with others to improve this.",
     }),
     [],
   );
@@ -368,8 +406,8 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
 
             {/* Max Borrow */}
             <motion.div variants={itemVariants} className="flex flex-col bg-white rounded-xl p-5 shadow-sm border">
-              <div className="flex items-center gap-4 mb-3">
-                <ChartBarIcon className="w-6 h-6 text-indigo-600" />
+              <div className="flex items-center gap-2 mb-3">
+                <CurrencyDollarIcon className="w-5 h-5 text-indigo-600" />
                 <h3 className="text-lg font-medium text-gray-700">Max Borrow</h3>
               </div>
               <div className="text-2xl font-bold text-indigo-700 mb-2">
@@ -391,17 +429,43 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                 <h3 className="text-lg">Achievements</h3>
               </div>
 
-              {derivedValues.achievements.length > 0 ? (
-                <ul className="space-y-3">
-                  {derivedValues.achievements.map(achievement => (
-                    <li key={achievement} className="flex items-center gap-2 text-sm">
-                      <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                      <span className="font-medium">{achievement}</span>
+              <ul className="space-y-3">
+                {SPECIFIC_ACHIEVEMENTS.map(ach => {
+                  // Determine if the user has this achievement
+                  let hasAchievement = false;
+                  if (ach.key === "ens") hasAchievement = !!reputationScore?.ens;
+                  if (ach.key === "wordId") hasAchievement = !!reputationScore?.wordId;
+                  if (ach.key === "defi") hasAchievement = (reputationScore?.components?.defiReputation ?? 0) > 50;
+
+                  return (
+                    <li key={ach.key} className="flex items-center gap-2 text-sm">
+                      {hasAchievement ? (
+                        <span className="w-6 h-6 flex items-center justify-center rounded bg-amber-100">
+                          <StarSolidIcon className="w-5 h-5 text-amber-400" />
+                        </span>
+                      ) : (
+                        <span className="w-6 h-6 flex items-center justify-center rounded border border-gray-300 bg-white" />
+                      )}
+                      <span className={`font-medium ${hasAchievement ? "text-gray-800" : "text-gray-400"}`}>
+                        {ach.label}
+                      </span>
                     </li>
-                  ))}
+                  );
+                })}
+              </ul>
+
+              {/* Optionally, show other achievements as before */}
+              {derivedValues.achievements.length > 0 && (
+                <ul className="space-y-3 mt-4">
+                  {derivedValues.achievements
+                    .filter(a => !SPECIFIC_ACHIEVEMENTS.some(s => s.label === a))
+                    .map(achievement => (
+                      <li key={achievement} className="flex items-center gap-2 text-sm">
+                        <CheckCircleIcon className="w-4 h-4 text-green-400" />
+                        <span className="font-medium">{achievement}</span>
+                      </li>
+                    ))}
                 </ul>
-              ) : (
-                <div className="text-sm text-gray-500 italic">Complete activities to earn achievements!</div>
               )}
 
               <Link
@@ -425,7 +489,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
               <h3 className="text-xl font-bold">Reputation Metrics</h3>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
               {derivedValues.reputationMetrics.map(({ label, score, color, bgColor, progressColor }) => (
                 <motion.div
                   key={label}
@@ -491,7 +555,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             </div>
           </motion.div>
 
-          {/* Recommendations Section */}
+          {/* Quest / Recommendations Section */}
           {reputationScore?.recommendations && reputationScore.recommendations.length > 0 && (
             <motion.div
               variants={containerVariants}
@@ -499,7 +563,10 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
               animate="visible"
               className="mb-10 bg-white rounded-xl p-6 shadow-md border border-gray-100"
             >
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Some quests for you</h3>
+              <div className="flex items-center gap-3 mb-4 text-blue-600 font-semibold">
+                <MapIcon className="w-6 h-6" />
+                <h3 className="text-xl font-bold text-gray-800">Your Quests</h3>
+              </div>
               <ul className="space-y-3">
                 {reputationScore.recommendations.map((recommendation, index) => (
                   <motion.li
@@ -507,8 +574,8 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                     variants={itemVariants}
                     className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg"
                   >
-                    <span className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-800 mt-0.5">
-                      {index + 1}
+                    <span className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 mt-0.5">
+                      <SparklesIcon className="w-5 h-5" />
                     </span>
                     <span className="text-sm text-blue-900">{recommendation}</span>
                   </motion.li>
