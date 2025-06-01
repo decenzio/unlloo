@@ -1,17 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Address, formatUnits, parseUnits } from "viem";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 
-// Token addresses - normalized to lowercase
-export const TOKEN_ADDRESSES = {
-  USDC: "0xf1815bd50389c46847f0bda824ec8da914045d14" as Address,
-  WETH: "0x2f6f07cdcf3588944bf4c42ac74ff24bf56e7590" as Address,
-  WBTC: "0xa0197b2044d28b08be34d98b23c9312158ea9a18" as Address,
-  UNLOO: "0x3084ae7cdb722689a47d41783507878b564f3b67" as Address,
-};
+// Constants
+const SIMULATION_DAYS = 7;
+const SECONDS_IN_YEAR = 365 * 24 * 60 * 60;
 
-// Interface for token metadata
+// Types
 export interface TokenMetadata {
   symbol: string;
   name: string;
@@ -19,6 +15,48 @@ export interface TokenMetadata {
   iconColor: string;
   imageUrl: string;
 }
+
+interface Pool {
+  liquidity: bigint;
+  tokenAddress: Address;
+  depositAPR: bigint;
+  borrowAPR: bigint;
+}
+
+interface UserDeposit {
+  tokenAddress: Address;
+  amount: bigint;
+  pool: Pool;
+  timestamp?: number;
+}
+
+interface UserBorrow {
+  tokenAddress: Address;
+  amount: bigint;
+  pool: Pool;
+  timestamp?: number;
+  simulatedInterest?: number;
+  totalOwed?: number;
+}
+
+interface UserPositions {
+  deposits: UserDeposit[];
+  borrows: UserBorrow[];
+}
+
+interface RepaymentInfo {
+  principal: string;
+  interest: string;
+  total: string;
+}
+
+// Token addresses - normalized to lowercase
+export const TOKEN_ADDRESSES = {
+  USDC: "0xf1815bd50389c46847f0bda824ec8da914045d14" as Address,
+  WETH: "0x2f6f07cdcf3588944bf4c42ac74ff24bf56e7590" as Address,
+  WBTC: "0xa0197b2044d28b08be34d98b23c9312158ea9a18" as Address,
+  UNLOO: "0x3084ae7cdb722689a47d41783507878b564f3b67" as Address,
+} as const;
 
 // Token metadata lookup with normalized addresses
 const TOKEN_METADATA: Record<string, TokenMetadata> = {
@@ -51,66 +89,9 @@ const TOKEN_METADATA: Record<string, TokenMetadata> = {
     imageUrl:
       "https://fcljjsnuzjacwqgiqiib.supabase.co/storage/v1/object/public/token_images/images/312a9958-4e00-46dc-a699-01f48f0eb4ec.jpg",
   },
-};
+} as const;
 
-// Export the utility function to get token metadata
-export const getTokenMetadata = (tokenAddress: Address): TokenMetadata => {
-  const normalizedAddress = tokenAddress.toLowerCase();
-
-  console.log(`[getTokenMetadata] Looking up metadata for: ${tokenAddress}`);
-  console.log(`[getTokenMetadata] Normalized to: ${normalizedAddress}`);
-  console.log(`[getTokenMetadata] Available keys:`, Object.keys(TOKEN_METADATA));
-  console.log(`[getTokenMetadata] UNLOO key:`, TOKEN_ADDRESSES.UNLOO.toLowerCase());
-
-  const metadata = TOKEN_METADATA[normalizedAddress];
-
-  if (metadata) {
-    console.log(`[getTokenMetadata] Found metadata for ${normalizedAddress}:`, metadata);
-    return metadata;
-  }
-
-  console.log(`[getTokenMetadata] No metadata found for ${normalizedAddress}, returning fallback`);
-
-  return {
-    symbol: "UNK",
-    name: "Unknown Token",
-    decimals: 18,
-    iconColor: "#6B7280",
-    imageUrl: "",
-  };
-};
-
-// Pool data structure from contract
-interface Pool {
-  liquidity: bigint;
-  tokenAddress: Address;
-  depositAPR: bigint;
-  borrowAPR: bigint;
-}
-
-// User position data structures with simulated interest
-interface UserDeposit {
-  tokenAddress: Address;
-  amount: bigint;
-  pool: Pool;
-  timestamp?: number;
-}
-
-interface UserBorrow {
-  tokenAddress: Address;
-  amount: bigint;
-  pool: Pool;
-  timestamp?: number;
-  simulatedInterest?: number; // For frontend display only
-  totalOwed?: number; // Principal + simulated interest for display
-}
-
-interface UserPositions {
-  deposits: UserDeposit[];
-  borrows: UserBorrow[];
-}
-
-// Enhanced ERC20 ABI with balance and allowance functions
+// Enhanced ERC20 ABI
 const ERC20_ABI = [
   {
     inputs: [
@@ -141,6 +122,85 @@ const ERC20_ABI = [
   },
 ] as const;
 
+// Logging utility (replace console.log in production)
+const logger = {
+  info: (message: string, data?: any) => {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[useLoanMaster] ${message}`, data);
+    }
+    // TODO: Replace with proper logging service in production
+  },
+  error: (message: string, error?: any) => {
+    console.error(`[useLoanMaster] ${message}`, error);
+    // TODO: Replace with proper error tracking service
+  },
+  warn: (message: string, data?: any) => {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[useLoanMaster] ${message}`, data);
+    }
+  },
+};
+
+// Export the utility function to get token metadata
+export const getTokenMetadata = (tokenAddress: Address): TokenMetadata => {
+  const normalizedAddress = tokenAddress.toLowerCase();
+  const metadata = TOKEN_METADATA[normalizedAddress];
+
+  if (metadata) {
+    return metadata;
+  }
+
+  logger.warn(`No metadata found for token address: ${tokenAddress}`);
+
+  return {
+    symbol: "UNK",
+    name: "Unknown Token",
+    decimals: 18,
+    iconColor: "#6B7280",
+    imageUrl: "",
+  };
+};
+
+// Custom hook for error handling
+const useErrorHandler = () => {
+  const handleError = useCallback((error: unknown, context: string): Error => {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    const enhancedError = new Error(`${context}: ${errorMessage}`);
+
+    logger.error(context, error);
+
+    return enhancedError;
+  }, []);
+
+  return { handleError };
+};
+
+// Custom hook for transaction management
+const useTransactionManager = (publicClient: any, walletClient: any) => {
+  const executeTransaction = useCallback(
+    async (contractCall: () => Promise<any>, context: string) => {
+      if (!walletClient || !publicClient) {
+        throw new Error("Wallet not connected");
+      }
+
+      try {
+        const { request } = await contractCall();
+        const hash = await walletClient.writeContract(request);
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+        logger.info(`${context} transaction successful`, { hash, blockNumber: receipt.blockNumber });
+
+        return receipt;
+      } catch (error) {
+        throw new Error(`${context} failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    },
+    [publicClient, walletClient],
+  );
+
+  return { executeTransaction };
+};
+
 export function useLoanMaster() {
   const { address: userAddress } = useAccount();
   const [pools, setPools] = useState<Pool[]>([]);
@@ -148,24 +208,33 @@ export function useLoanMaster() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Get clients from wagmi
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const { handleError } = useErrorHandler();
+  const { executeTransaction } = useTransactionManager(publicClient, walletClient);
 
-  // Get the LoanMaster contract info - Fixed deprecation warning
   const { data: loanMasterContractData } = useDeployedContractInfo({
     contractName: "LoanMaster",
   });
+
+  // Memoized simulated APR lookup
+  const displayBorrowAPRs = useMemo(
+    () => ({
+      [TOKEN_ADDRESSES.USDC]: 1000, // 10%
+      [TOKEN_ADDRESSES.WETH]: 800, // 8%
+      [TOKEN_ADDRESSES.WBTC]: 900, // 9%
+      [TOKEN_ADDRESSES.UNLOO]: 750, // 7.5%
+    }),
+    [],
+  );
 
   // Simulate interest calculation for frontend display
   const calculateSimulatedInterest = useCallback(
     (principal: number, aprBasisPoints: number, timestamp: number): { interest: number; total: number } => {
       const now = Date.now() / 1000;
       const timeElapsed = now - timestamp;
-      const secondsInYear = 365 * 24 * 60 * 60;
-
       const apr = aprBasisPoints / 10000;
-      const interest = (principal * apr * timeElapsed) / secondsInYear;
+      const interest = (principal * apr * timeElapsed) / SECONDS_IN_YEAR;
       const total = principal + interest;
 
       return { interest, total };
@@ -173,19 +242,15 @@ export function useLoanMaster() {
     [],
   );
 
-  // Get simulated APR for display (since contract has 0% borrow APR)
-  const getDisplayBorrowAPR = useCallback((tokenAddress: Address): number => {
-    // Return simulated APRs for frontend display
-    const simulatedAPRs: Record<Address, number> = {
-      [TOKEN_ADDRESSES.USDC]: 1000, // 10%
-      [TOKEN_ADDRESSES.WETH]: 800, // 8%
-      [TOKEN_ADDRESSES.WBTC]: 900, // 9%
-      [TOKEN_ADDRESSES.UNLOO]: 750, // 7.5% - Added UNLOO APR
-    };
-    return simulatedAPRs[tokenAddress] || 1000;
-  }, []);
+  // Get simulated APR for display
+  const getDisplayBorrowAPR = useCallback(
+    (tokenAddress: Address): number => {
+      return displayBorrowAPRs[tokenAddress] || 1000;
+    },
+    [displayBorrowAPRs],
+  );
 
-  // Helper function to check token balance
+  // Optimized token balance check
   const checkTokenBalance = useCallback(
     async (
       tokenAddress: Address,
@@ -206,7 +271,7 @@ export function useLoanMaster() {
         const requiredAmountBigInt = parseUnits(requiredAmount, decimals);
         const hasEnough = balance >= requiredAmountBigInt;
 
-        console.log(`Token Balance Check:`, {
+        logger.info("Token balance check", {
           token: tokenAddress,
           balance: formatUnits(balance, decimals),
           required: requiredAmount,
@@ -215,14 +280,14 @@ export function useLoanMaster() {
 
         return hasEnough;
       } catch (error) {
-        console.error("Error checking token balance:", error);
+        logger.error("Error checking token balance", error);
         return false;
       }
     },
     [publicClient],
   );
 
-  // Helper function to check token allowance
+  // Optimized token allowance check
   const checkTokenAllowance = useCallback(
     async (
       tokenAddress: Address,
@@ -244,7 +309,7 @@ export function useLoanMaster() {
         const requiredAmountBigInt = parseUnits(requiredAmount, decimals);
         const hasEnoughAllowance = allowance >= requiredAmountBigInt;
 
-        console.log(`Token Allowance Check:`, {
+        logger.info("Token allowance check", {
           token: tokenAddress,
           allowance: formatUnits(allowance, decimals),
           required: requiredAmount,
@@ -253,14 +318,14 @@ export function useLoanMaster() {
 
         return hasEnoughAllowance;
       } catch (error) {
-        console.error("Error checking token allowance:", error);
+        logger.error("Error checking token allowance", error);
         return false;
       }
     },
     [publicClient],
   );
 
-  // Enhanced approve function with better error handling
+  // Enhanced approve function
   const approveToken = useCallback(
     async (tokenAddress: Address, spenderAddress: Address, amount: string, decimals: number) => {
       if (!walletClient || !userAddress || !publicClient) {
@@ -268,151 +333,168 @@ export function useLoanMaster() {
       }
 
       try {
-        console.log(`=== Approving Token ===`);
-        console.log(`Token: ${tokenAddress}`);
-        console.log(`Spender: ${spenderAddress}`);
-        console.log(`Amount: ${amount}`);
+        logger.info("Approving token", { token: tokenAddress, spender: spenderAddress, amount });
 
-        // Check if user has enough balance
+        // Check balance first
         const hasBalance = await checkTokenBalance(tokenAddress, userAddress, amount, decimals);
         if (!hasBalance) {
           throw new Error(`Insufficient token balance. Required: ${amount}`);
         }
 
         const parsedAmount = parseUnits(amount, decimals);
-        console.log(`Parsed amount: ${parsedAmount.toString()}`);
 
-        const { request } = await publicClient.simulateContract({
-          address: tokenAddress,
-          abi: ERC20_ABI,
-          functionName: "approve",
-          args: [spenderAddress, parsedAmount],
-          account: userAddress,
-        });
-
-        const hash = await walletClient.writeContract(request);
-        console.log(`Approval transaction hash: ${hash}`);
-
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        console.log(`Approval confirmed in block: ${receipt.blockNumber}`);
-
-        return receipt;
+        return await executeTransaction(
+          () =>
+            publicClient.simulateContract({
+              address: tokenAddress,
+              abi: ERC20_ABI,
+              functionName: "approve",
+              args: [spenderAddress, parsedAmount],
+              account: userAddress,
+            }),
+          "Token approval",
+        );
       } catch (error) {
-        console.error("Token approval failed:", error);
-        throw new Error(`Token approval failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+        throw handleError(error, "Token approval");
       }
     },
-    [walletClient, userAddress, publicClient, checkTokenBalance],
+    [walletClient, userAddress, publicClient, checkTokenBalance, executeTransaction, handleError],
   );
 
-  // Refresh data function
+  // Optimized data refresh function
   const refreshData = useCallback(async () => {
-    if (!loanMasterContractData?.address || !publicClient) return;
+    if (!loanMasterContractData?.address || !publicClient) {
+      logger.warn("Missing contract data or public client");
+      return;
+    }
 
     try {
-      // Refetch pools
+      logger.info("Refreshing pools and user positions");
+
+      // Fetch pool count
       const poolCount = (await publicClient.readContract({
         address: loanMasterContractData.address,
         abi: loanMasterContractData.abi,
         functionName: "getLiquidityPoolCount",
       })) as bigint;
 
-      const poolsData: Pool[] = [];
-      for (let i = 0; i < Number(poolCount); i++) {
-        try {
-          const tokenAddress = Object.values(TOKEN_ADDRESSES)[i % Object.keys(TOKEN_ADDRESSES).length];
-          const poolInfo = (await publicClient.readContract({
-            address: loanMasterContractData.address,
-            abi: loanMasterContractData.abi,
-            functionName: "getLiquidityPoolByToken",
-            args: [tokenAddress],
-          })) as {
-            liquidity: bigint;
-            tokenAddress: Address;
-            depositAPR: bigint;
-            borrowAPR: bigint;
-          };
+      // Fetch all pools in parallel
+      const poolPromises = Object.values(TOKEN_ADDRESSES)
+        .slice(0, Number(poolCount))
+        .map(async tokenAddress => {
+          try {
+            const poolInfo = (await publicClient.readContract({
+              address: loanMasterContractData.address,
+              abi: loanMasterContractData.abi,
+              functionName: "getLiquidityPoolByToken",
+              args: [tokenAddress],
+            })) as Pool;
 
-          if (poolInfo) {
-            // Override the borrowAPR for display purposes
-            poolsData.push({
-              liquidity: poolInfo.liquidity,
-              tokenAddress: poolInfo.tokenAddress,
-              depositAPR: poolInfo.depositAPR,
-              borrowAPR: BigInt(getDisplayBorrowAPR(tokenAddress)), // Use simulated APR
-            });
+            if (poolInfo) {
+              return {
+                ...poolInfo,
+                borrowAPR: BigInt(getDisplayBorrowAPR(tokenAddress)), // Use simulated APR
+              };
+            }
+            return null;
+          } catch (err) {
+            logger.error(`Error fetching pool for token ${tokenAddress}`, err);
+            return null;
           }
-        } catch (err) {
-          console.error(`Error fetching pool ${i}:`, err);
-        }
-      }
+        });
+
+      const poolResults = await Promise.allSettled(poolPromises);
+      const poolsData = poolResults
+        .filter(
+          (result): result is PromiseFulfilledResult<Pool> => result.status === "fulfilled" && result.value !== null,
+        )
+        .map(result => result.value);
 
       setPools(poolsData);
 
-      // Refetch user positions if user is connected
+      // Fetch user positions if user is connected
       if (userAddress && poolsData.length > 0) {
-        const deposits: UserDeposit[] = [];
-        const borrows: UserBorrow[] = [];
-
-        for (const pool of poolsData) {
+        const positionPromises = poolsData.map(async pool => {
           try {
-            const depositAmount = (await publicClient.readContract({
-              address: loanMasterContractData.address,
-              abi: loanMasterContractData.abi,
-              functionName: "getUserDeposit",
-              args: [pool.tokenAddress, userAddress],
-            })) as bigint;
+            const [depositAmount, borrowAmount] = await Promise.all([
+              publicClient.readContract({
+                address: loanMasterContractData.address,
+                abi: loanMasterContractData.abi,
+                functionName: "getUserDeposit",
+                args: [pool.tokenAddress, userAddress],
+              }) as Promise<bigint>,
+              publicClient.readContract({
+                address: loanMasterContractData.address,
+                abi: loanMasterContractData.abi,
+                functionName: "getUserBorrow",
+                args: [pool.tokenAddress, userAddress],
+              }) as Promise<bigint>,
+            ]);
 
-            if (depositAmount > 0n) {
-              deposits.push({
-                tokenAddress: pool.tokenAddress,
-                amount: depositAmount,
-                pool,
-              });
-            }
+            return {
+              deposit:
+                depositAmount > 0n
+                  ? {
+                      tokenAddress: pool.tokenAddress,
+                      amount: depositAmount,
+                      pool,
+                    }
+                  : null,
+              borrow:
+                borrowAmount > 0n
+                  ? (() => {
+                      const metadata = getTokenMetadata(pool.tokenAddress);
+                      const principalFloat = parseFloat(formatUnits(borrowAmount, metadata.decimals));
+                      const borrowTimestamp = Date.now() / 1000 - SIMULATION_DAYS * 24 * 60 * 60;
+                      const displayAPR = getDisplayBorrowAPR(pool.tokenAddress);
+                      const { interest, total } = calculateSimulatedInterest(
+                        principalFloat,
+                        displayAPR,
+                        borrowTimestamp,
+                      );
 
-            const borrowAmount = (await publicClient.readContract({
-              address: loanMasterContractData.address,
-              abi: loanMasterContractData.abi,
-              functionName: "getUserBorrow",
-              args: [pool.tokenAddress, userAddress],
-            })) as bigint;
-
-            if (borrowAmount > 0n) {
-              const metadata = getTokenMetadata(pool.tokenAddress);
-              const principalFloat = parseFloat(formatUnits(borrowAmount, metadata.decimals));
-
-              // Simulate interest calculation for display
-              const borrowTimestamp = Date.now() / 1000 - 7 * 24 * 60 * 60; // Simulate 7 days ago
-              const displayAPR = getDisplayBorrowAPR(pool.tokenAddress);
-              const { interest, total } = calculateSimulatedInterest(principalFloat, displayAPR, borrowTimestamp);
-
-              borrows.push({
-                tokenAddress: pool.tokenAddress,
-                amount: borrowAmount,
-                pool,
-                timestamp: borrowTimestamp,
-                simulatedInterest: interest,
-                totalOwed: total,
-              });
-            }
+                      return {
+                        tokenAddress: pool.tokenAddress,
+                        amount: borrowAmount,
+                        pool,
+                        timestamp: borrowTimestamp,
+                        simulatedInterest: interest,
+                        totalOwed: total,
+                      };
+                    })()
+                  : null,
+            };
           } catch (err) {
-            console.error(`Error fetching user position for token ${pool.tokenAddress}:`, err);
+            logger.error(`Error fetching user position for token ${pool.tokenAddress}`, err);
+            return { deposit: null, borrow: null };
           }
-        }
+        });
+
+        const positionResults = await Promise.allSettled(positionPromises);
+        const positions = positionResults
+          .filter((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")
+          .map(result => result.value);
+
+        const deposits = positions.map(p => p.deposit).filter(Boolean) as UserDeposit[];
+        const borrows = positions.map(p => p.borrow).filter(Boolean) as UserBorrow[];
 
         setUserPositions({ deposits, borrows });
       }
-    } catch (error) {
-      console.error("Error refreshing data:", error);
-      setError(error instanceof Error ? error.message : "Unknown error occurred");
-    }
-  }, [loanMasterContractData, publicClient, userAddress, getDisplayBorrowAPR, calculateSimulatedInterest]);
 
-  // Find this useEffect around line 386 and update it:
+      logger.info("Data refresh completed", { poolsCount: poolsData.length });
+    } catch (error) {
+      const errorMessage = handleError(error, "Data refresh");
+      setError(errorMessage.message);
+    }
+  }, [loanMasterContractData, publicClient, userAddress, getDisplayBorrowAPR, calculateSimulatedInterest, handleError]);
+
+  // Initial data fetch with proper error handling
   useEffect(() => {
-    const fetchPools = async () => {
-      if (!loanMasterContractData?.address || !publicClient) return;
+    const fetchInitialData = async () => {
+      if (!loanMasterContractData?.address || !publicClient) {
+        logger.info("Waiting for contract data and public client");
+        return;
+      }
 
       setIsLoading(true);
       setError(null);
@@ -420,25 +502,25 @@ export function useLoanMaster() {
       try {
         await refreshData();
       } catch (error) {
-        console.error("Error loading pools:", error);
-        setError(error instanceof Error ? error.message : "Failed to load pools");
+        const errorMessage = handleError(error, "Initial data fetch");
+        setError(errorMessage.message);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchPools();
-  }, [loanMasterContractData, publicClient, refreshData]);
+    fetchInitialData();
+  }, [loanMasterContractData, publicClient, refreshData, handleError]);
 
-  // Helper function to format token amounts
+  // Memoized helper function
   const formatTokenAmount = useCallback((amount: bigint, decimals: number) => {
     return formatUnits(amount, decimals);
   }, []);
 
-  // Function to add liquidity to a pool
+  // Optimized liquidity functions
   const addLiquidity = useCallback(
     async (tokenAddress: Address, amount: string, decimals: number) => {
-      if (!amount || !userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
+      if (!amount || !userAddress || !loanMasterContractData?.address) {
         throw new Error("Missing required parameters or wallet not connected");
       }
 
@@ -446,8 +528,7 @@ export function useLoanMaster() {
       if (poolIndex === -1) throw new Error("Pool not found");
 
       try {
-        console.log(`=== Adding Liquidity ===`);
-        console.log(`Token: ${tokenAddress}, Amount: ${amount}`);
+        logger.info("Adding liquidity", { token: tokenAddress, amount });
 
         // Check balance first
         const hasBalance = await checkTokenBalance(tokenAddress, userAddress, amount, decimals);
@@ -460,42 +541,40 @@ export function useLoanMaster() {
 
         // Add liquidity
         const parsedAmount = parseUnits(amount, decimals);
-        const { request } = await publicClient.simulateContract({
-          address: loanMasterContractData.address,
-          abi: loanMasterContractData.abi,
-          functionName: "addLiquidity",
-          args: [BigInt(poolIndex), parsedAmount],
-          account: userAddress,
-        });
+        await executeTransaction(
+          () =>
+            publicClient!.simulateContract({
+              address: loanMasterContractData.address,
+              abi: loanMasterContractData.abi,
+              functionName: "addLiquidity",
+              args: [BigInt(poolIndex), parsedAmount],
+              account: userAddress,
+            }),
+          "Add liquidity",
+        );
 
-        const hash = await walletClient.writeContract(request);
-        await publicClient.waitForTransactionReceipt({ hash });
-
-        console.log("Liquidity added successfully!");
-
-        // Refresh data after successful transaction
         await refreshData();
+        logger.info("Liquidity added successfully");
       } catch (error) {
-        console.error("Error adding liquidity:", error);
-        throw error;
+        throw handleError(error, "Add liquidity");
       }
     },
     [
       pools,
       userAddress,
       loanMasterContractData,
-      walletClient,
       publicClient,
       checkTokenBalance,
       approveToken,
+      executeTransaction,
       refreshData,
+      handleError,
     ],
   );
 
-  // Function to remove liquidity from a pool
   const removeLiquidity = useCallback(
     async (tokenAddress: Address) => {
-      if (!userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
+      if (!userAddress || !loanMasterContractData?.address) {
         throw new Error("Wallet not connected");
       }
 
@@ -503,36 +582,32 @@ export function useLoanMaster() {
       if (poolIndex === -1) throw new Error("Pool not found");
 
       try {
-        console.log(`=== Removing Liquidity ===`);
-        console.log(`Token: ${tokenAddress}`);
+        logger.info("Removing liquidity", { token: tokenAddress });
 
-        const { request } = await publicClient.simulateContract({
-          address: loanMasterContractData.address,
-          abi: loanMasterContractData.abi,
-          functionName: "removeLiquidity",
-          args: [BigInt(poolIndex)],
-          account: userAddress,
-        });
+        await executeTransaction(
+          () =>
+            publicClient!.simulateContract({
+              address: loanMasterContractData.address,
+              abi: loanMasterContractData.abi,
+              functionName: "removeLiquidity",
+              args: [BigInt(poolIndex)],
+              account: userAddress,
+            }),
+          "Remove liquidity",
+        );
 
-        const hash = await walletClient.writeContract(request);
-        await publicClient.waitForTransactionReceipt({ hash });
-
-        console.log("Liquidity removed successfully!");
-
-        // Refresh data after successful transaction
         await refreshData();
+        logger.info("Liquidity removed successfully");
       } catch (error) {
-        console.error("Error removing liquidity:", error);
-        throw error;
+        throw handleError(error, "Remove liquidity");
       }
     },
-    [pools, userAddress, loanMasterContractData, walletClient, publicClient, refreshData],
+    [pools, userAddress, loanMasterContractData, publicClient, executeTransaction, refreshData, handleError],
   );
 
-  // Function to borrow from a pool
   const borrow = useCallback(
     async (tokenAddress: Address, amount: string, decimals: number) => {
-      if (!amount || !userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
+      if (!amount || !userAddress || !loanMasterContractData?.address) {
         throw new Error("Missing required parameters or wallet not connected");
       }
 
@@ -540,46 +615,41 @@ export function useLoanMaster() {
       if (poolIndex === -1) throw new Error("Pool not found");
 
       try {
-        console.log(`=== Borrowing ===`);
-        console.log(`Token: ${tokenAddress}, Amount: ${amount}`);
+        logger.info("Borrowing", { token: tokenAddress, amount });
 
         const parsedAmount = parseUnits(amount, decimals);
-        const { request } = await publicClient.simulateContract({
-          address: loanMasterContractData.address,
-          abi: loanMasterContractData.abi,
-          functionName: "borrow",
-          args: [BigInt(poolIndex), parsedAmount],
-          account: userAddress,
-        });
+        await executeTransaction(
+          () =>
+            publicClient!.simulateContract({
+              address: loanMasterContractData.address,
+              abi: loanMasterContractData.abi,
+              functionName: "borrow",
+              args: [BigInt(poolIndex), parsedAmount],
+              account: userAddress,
+            }),
+          "Borrow",
+        );
 
-        const hash = await walletClient.writeContract(request);
-        await publicClient.waitForTransactionReceipt({ hash });
-
-        console.log("Borrow successful!");
-
-        // Refresh data after successful transaction
         await refreshData();
+        logger.info("Borrow successful");
       } catch (error) {
-        console.error("Error borrowing:", error);
-        throw error;
+        throw handleError(error, "Borrow");
       }
     },
-    [pools, userAddress, loanMasterContractData, walletClient, publicClient, refreshData],
+    [pools, userAddress, loanMasterContractData, publicClient, executeTransaction, refreshData, handleError],
   );
 
-  // Simplified repay function - only repays principal amount
   const repayBorrow = useCallback(
     async (tokenAddress: Address) => {
-      if (!userAddress || !loanMasterContractData?.address || !walletClient || !publicClient) {
+      if (!userAddress || !loanMasterContractData?.address) {
         throw new Error("Wallet not connected");
       }
 
       try {
-        console.log("=== Repaying Borrow (Principal Only) ===");
-        console.log("Token Address:", tokenAddress);
+        logger.info("Repaying borrow (principal only)", { token: tokenAddress });
 
-        // Get exact borrowed amount (principal only)
-        const borrowedAmount = (await publicClient.readContract({
+        // Get exact borrowed amount
+        const borrowedAmount = (await publicClient!.readContract({
           address: loanMasterContractData.address,
           abi: loanMasterContractData.abi,
           functionName: "getUserBorrow",
@@ -593,7 +663,7 @@ export function useLoanMaster() {
         const metadata = getTokenMetadata(tokenAddress);
         const repayAmountString = formatUnits(borrowedAmount, metadata.decimals);
 
-        console.log(`Repaying exactly: ${repayAmountString} ${metadata.symbol} (principal only)`);
+        logger.info(`Repaying exactly: ${repayAmountString} ${metadata.symbol} (principal only)`);
 
         // Check balance
         const hasBalance = await checkTokenBalance(tokenAddress, userAddress, repayAmountString, metadata.decimals);
@@ -605,30 +675,39 @@ export function useLoanMaster() {
         await approveToken(tokenAddress, loanMasterContractData.address, repayAmountString, metadata.decimals);
 
         // Repay
-        const { request } = await publicClient.simulateContract({
-          address: loanMasterContractData.address,
-          abi: loanMasterContractData.abi,
-          functionName: "repayBorrow",
-          args: [tokenAddress],
-          account: userAddress,
-        });
+        await executeTransaction(
+          () =>
+            publicClient!.simulateContract({
+              address: loanMasterContractData.address,
+              abi: loanMasterContractData.abi,
+              functionName: "repayBorrow",
+              args: [tokenAddress],
+              account: userAddress,
+            }),
+          "Repay borrow",
+        );
 
-        const hash = await walletClient.writeContract(request);
-        await publicClient.waitForTransactionReceipt({ hash });
-
-        console.log("Repayment successful!");
         await refreshData();
+        logger.info("Repayment successful");
       } catch (error) {
-        console.error("Error repaying borrow:", error);
-        throw error;
+        throw handleError(error, "Repay borrow");
       }
     },
-    [userAddress, loanMasterContractData, walletClient, publicClient, checkTokenBalance, approveToken, refreshData],
+    [
+      userAddress,
+      loanMasterContractData,
+      publicClient,
+      checkTokenBalance,
+      approveToken,
+      executeTransaction,
+      refreshData,
+      handleError,
+    ],
   );
 
-  // Get repayment amount for display (includes simulated interest)
+  // Memoized repayment calculations
   const getDisplayRepaymentAmount = useCallback(
-    (tokenAddress: Address): { principal: string; interest: string; total: string } => {
+    (tokenAddress: Address): RepaymentInfo => {
       const userBorrow = userPositions.borrows.find(b => b.tokenAddress === tokenAddress);
       if (!userBorrow) {
         return { principal: "0", interest: "0", total: "0" };
@@ -648,7 +727,6 @@ export function useLoanMaster() {
     [userPositions.borrows],
   );
 
-  // Get actual repayment amount (only principal)
   const getActualRepaymentAmount = useCallback(
     async (tokenAddress: Address): Promise<string> => {
       if (!userAddress || !loanMasterContractData?.address || !publicClient) {
@@ -666,29 +744,49 @@ export function useLoanMaster() {
         const metadata = getTokenMetadata(tokenAddress);
         return formatUnits(amount, metadata.decimals);
       } catch (error) {
-        console.error("Error getting actual repayment amount:", error);
+        logger.error("Error getting actual repayment amount", error);
         return "0";
       }
     },
     [userAddress, loanMasterContractData, publicClient],
   );
 
-  return {
-    pools,
-    userPositions,
-    isLoading,
-    error,
-    addLiquidity,
-    removeLiquidity,
-    borrow,
-    repayBorrow,
-    formatTokenAmount,
-    refreshData,
-    TOKEN_ADDRESSES,
-    checkTokenBalance,
-    checkTokenAllowance,
-    getDisplayRepaymentAmount,
-    getActualRepaymentAmount,
-    calculateSimulatedInterest,
-  };
+  // Memoized return value to prevent unnecessary re-renders
+  return useMemo(
+    () => ({
+      pools,
+      userPositions,
+      isLoading,
+      error,
+      addLiquidity,
+      removeLiquidity,
+      borrow,
+      repayBorrow,
+      formatTokenAmount,
+      refreshData,
+      TOKEN_ADDRESSES,
+      checkTokenBalance,
+      checkTokenAllowance,
+      getDisplayRepaymentAmount,
+      getActualRepaymentAmount,
+      calculateSimulatedInterest,
+    }),
+    [
+      pools,
+      userPositions,
+      isLoading,
+      error,
+      addLiquidity,
+      removeLiquidity,
+      borrow,
+      repayBorrow,
+      formatTokenAmount,
+      refreshData,
+      checkTokenBalance,
+      checkTokenAllowance,
+      getDisplayRepaymentAmount,
+      getActualRepaymentAmount,
+      calculateSimulatedInterest,
+    ],
+  );
 }
