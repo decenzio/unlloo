@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Address } from "viem";
 import { ArrowTrendingUpIcon, ChevronDownIcon, CogIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useWbtcToUsd } from "~~/hooks/custom/useBtcPrice";
 import { useEthToUsd } from "~~/hooks/custom/useEthPrice";
 import { getTokenMetadata, useLoanMaster } from "~~/hooks/custom/useLoanMaster";
+import { useUnlooToUsd } from "~~/hooks/custom/useUnlooPrice";
 
 // Enhanced crypto icon component with image support
 const CryptoIcon = ({
@@ -49,11 +50,16 @@ const CryptoIcon = ({
 };
 
 export default function BorrowDashboard() {
+  console.log(`[BorrowDashboard] Component render started at ${new Date().toISOString()}`);
+
+  // Add state to track if component has mounted (client-side only)
+  const [isMounted, setIsMounted] = useState(false);
+
   const {
     pools,
     userPositions,
-    isLoading,
-    error,
+    isLoading: loanMasterLoading,
+    error: loanMasterError,
     borrow,
     repayBorrow,
     formatTokenAmount,
@@ -61,119 +67,294 @@ export default function BorrowDashboard() {
     getDisplayRepaymentAmount,
   } = useLoanMaster();
 
+  // Debug logging for LoanMaster contract
+  useEffect(() => {
+    console.log("[BorrowDashboard] LoanMaster contract check:", {
+      isLoading: loanMasterLoading,
+      error: loanMasterError,
+      poolsLength: pools.length,
+      timestamp: new Date().toISOString(),
+    });
+  }, [loanMasterLoading, loanMasterError, pools.length]);
+
+  console.log(`[BorrowDashboard] useLoanMaster data:`, {
+    poolsLength: pools.length,
+    userPositionsLength: userPositions.borrows.length,
+    isLoading: loanMasterLoading,
+    error: loanMasterError,
+    TOKEN_ADDRESSES,
+    timestamp: new Date().toISOString(),
+  });
+
   const [selectedTokenAddress, setSelectedTokenAddress] = useState<Address>(TOKEN_ADDRESSES.USDC);
   const [showAssetSelector, setShowAssetSelector] = useState(false);
   const [borrowAmount, setBorrowAmount] = useState("");
   const [isRepaying, setIsRepaying] = useState<Record<Address, boolean>>({});
   const [isBorrowing, setIsBorrowing] = useState(false);
 
-  // Calculate total borrowed amounts for each token
+  console.log(`[BorrowDashboard] Component state:`, {
+    selectedTokenAddress,
+    borrowAmount,
+    isBorrowing,
+    timestamp: new Date().toISOString(),
+  });
+
+  // Set mounted flag after component mounts (client-side only)
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Calculate total borrowed amounts for each token INCLUDING UNLOO
   const totalBorrowedAmounts = useMemo(() => {
+    console.log(
+      `[BorrowDashboard] Calculating totalBorrowedAmounts from userPositions.borrows:`,
+      userPositions.borrows,
+    );
+
     const amounts = {
       eth: 0,
       wbtc: 0,
       usdc: 0,
+      unloo: 0, // Added UNLOO
     };
 
-    userPositions.borrows.forEach(borrow => {
+    userPositions.borrows.forEach((borrow, index) => {
+      console.log(`[BorrowDashboard] Processing borrow ${index}:`, borrow);
+
       const metadata = getTokenMetadata(borrow.tokenAddress);
+      console.log(`[BorrowDashboard] Token metadata for ${borrow.tokenAddress}:`, metadata);
+
       const amount = parseFloat(formatTokenAmount(borrow.amount, metadata.decimals));
+      console.log(`[BorrowDashboard] Formatted amount:`, amount);
 
       if (metadata.symbol === "WETH") {
         amounts.eth += amount;
+        console.log(`[BorrowDashboard] Added ${amount} to ETH, total now:`, amounts.eth);
       } else if (metadata.symbol === "WBTC") {
         amounts.wbtc += amount;
+        console.log(`[BorrowDashboard] Added ${amount} to WBTC, total now:`, amounts.wbtc);
       } else if (metadata.symbol === "USDC") {
         amounts.usdc += amount;
+        console.log(`[BorrowDashboard] Added ${amount} to USDC, total now:`, amounts.usdc);
+      } else if (metadata.symbol === "UNLOO") {
+        amounts.unloo += amount;
+        console.log(`[BorrowDashboard] Added ${amount} to UNLOO, total now:`, amounts.unloo);
       }
     });
 
+    console.log(`[BorrowDashboard] Final totalBorrowedAmounts:`, amounts);
     return amounts;
   }, [userPositions.borrows, formatTokenAmount]);
 
-  // Get USD values for borrowed amounts
-  const { usdValue: ethBorrowedUsd, loading: ethLoading } = useEthToUsd(totalBorrowedAmounts.eth);
-  const { usdValue: wbtcBorrowedUsd, loading: wbtcLoading } = useWbtcToUsd(totalBorrowedAmounts.wbtc);
+  // Get USD values for borrowed amounts INCLUDING UNLOO
+  console.log(`[BorrowDashboard] About to call useEthToUsd with amount:`, totalBorrowedAmounts.eth);
+  const { usdValue: ethBorrowedUsd, loading: ethLoading, error: ethError } = useEthToUsd(totalBorrowedAmounts.eth);
+  console.log(`[BorrowDashboard] useEthToUsd result:`, {
+    usdValue: ethBorrowedUsd,
+    loading: ethLoading,
+    error: ethError,
+  });
+
+  console.log(`[BorrowDashboard] About to call useWbtcToUsd with amount:`, totalBorrowedAmounts.wbtc);
+  const { usdValue: wbtcBorrowedUsd, loading: wbtcLoading, error: wbtcError } = useWbtcToUsd(totalBorrowedAmounts.wbtc);
+  console.log(`[BorrowDashboard] useWbtcToUsd result:`, {
+    usdValue: wbtcBorrowedUsd,
+    loading: wbtcLoading,
+    error: wbtcError,
+  });
+
+  console.log(`[BorrowDashboard] About to call useUnlooToUsd with amount:`, totalBorrowedAmounts.unloo);
+  const {
+    usdValue: unlooBorrowedUsd,
+    loading: unlooLoading,
+    error: unlooError,
+  } = useUnlooToUsd(totalBorrowedAmounts.unloo);
+  console.log(`[BorrowDashboard] useUnlooToUsd result:`, {
+    usdValue: unlooBorrowedUsd,
+    loading: unlooLoading,
+    error: unlooError,
+  });
 
   // Calculate current USD value for the borrow amount input
   const selectedAssetMetadata = getTokenMetadata(selectedTokenAddress);
+  console.log(`[BorrowDashboard] Selected asset metadata:`, selectedAssetMetadata);
+
   const currentBorrowAmountNumber = parseFloat(borrowAmount) || 0;
+  console.log(`[BorrowDashboard] Current borrow amount number:`, currentBorrowAmountNumber);
 
-  const { usdValue: ethInputUsd } = useEthToUsd(
-    selectedAssetMetadata.symbol === "WETH" ? currentBorrowAmountNumber : 0,
-  );
-  const { usdValue: wbtcInputUsd } = useWbtcToUsd(
-    selectedAssetMetadata.symbol === "WBTC" ? currentBorrowAmountNumber : 0,
+  const ethInputAmount = selectedAssetMetadata.symbol === "WETH" ? currentBorrowAmountNumber : 0;
+  const wbtcInputAmount = selectedAssetMetadata.symbol === "WBTC" ? currentBorrowAmountNumber : 0;
+  const unlooInputAmount = selectedAssetMetadata.symbol === "UNLOO" ? currentBorrowAmountNumber : 0;
+
+  console.log(
+    `[BorrowDashboard] Input amounts - ETH: ${ethInputAmount}, WBTC: ${wbtcInputAmount}, UNLOO: ${unlooInputAmount}`,
   );
 
-  // Calculate total borrowed USD value
+  const { usdValue: ethInputUsd, error: ethInputError } = useEthToUsd(ethInputAmount);
+  const { usdValue: wbtcInputUsd, error: wbtcInputError } = useWbtcToUsd(wbtcInputAmount);
+  const { usdValue: unlooInputUsd, error: unlooInputError } = useUnlooToUsd(unlooInputAmount);
+
+  console.log(
+    `[BorrowDashboard] Input USD values - ETH: ${ethInputUsd}, WBTC: ${wbtcInputUsd}, UNLOO: ${unlooInputUsd}`,
+  );
+  console.log(
+    `[BorrowDashboard] Input errors - ETH: ${ethInputError}, WBTC: ${wbtcInputError}, UNLOO: ${unlooInputError}`,
+  );
+
+  // Calculate total borrowed USD value INCLUDING UNLOO
   const totalBorrowedUsd = useMemo(() => {
+    console.log(`[BorrowDashboard] Calculating totalBorrowedUsd with:`, {
+      ethBorrowedUsd,
+      wbtcBorrowedUsd,
+      unlooBorrowedUsd,
+      usdcAmount: totalBorrowedAmounts.usdc,
+    });
+
     let total = 0;
 
-    if (ethBorrowedUsd !== null) total += ethBorrowedUsd;
-    if (wbtcBorrowedUsd !== null) total += wbtcBorrowedUsd;
+    if (ethBorrowedUsd !== null) {
+      total += ethBorrowedUsd;
+      console.log(`[BorrowDashboard] Added ETH USD value ${ethBorrowedUsd}, total now: ${total}`);
+    }
+    if (wbtcBorrowedUsd !== null) {
+      total += wbtcBorrowedUsd;
+      console.log(`[BorrowDashboard] Added WBTC USD value ${wbtcBorrowedUsd}, total now: ${total}`);
+    }
+    if (unlooBorrowedUsd !== null) {
+      total += unlooBorrowedUsd;
+      console.log(`[BorrowDashboard] Added UNLOO USD value ${unlooBorrowedUsd}, total now: ${total}`);
+    }
     total += totalBorrowedAmounts.usdc; // USDC is 1:1 with USD
+    console.log(`[BorrowDashboard] Added USDC ${totalBorrowedAmounts.usdc}, final total: ${total}`);
 
     return total;
-  }, [ethBorrowedUsd, wbtcBorrowedUsd, totalBorrowedAmounts.usdc]);
+  }, [ethBorrowedUsd, wbtcBorrowedUsd, unlooBorrowedUsd, totalBorrowedAmounts.usdc]);
 
-  // Calculate potential new total with current input
+  // Calculate potential new total with current input INCLUDING UNLOO
   const potentialNewTotal = useMemo(() => {
+    console.log(`[BorrowDashboard] Calculating potentialNewTotal with:`, {
+      totalBorrowedUsd,
+      selectedAssetSymbol: selectedAssetMetadata.symbol,
+      ethInputUsd,
+      wbtcInputUsd,
+      unlooInputUsd,
+      currentBorrowAmountNumber,
+    });
+
     let newTotal = totalBorrowedUsd;
 
     if (selectedAssetMetadata.symbol === "WETH" && ethInputUsd !== null) {
       newTotal += ethInputUsd;
+      console.log(`[BorrowDashboard] Added WETH input ${ethInputUsd}, new total: ${newTotal}`);
     } else if (selectedAssetMetadata.symbol === "WBTC" && wbtcInputUsd !== null) {
       newTotal += wbtcInputUsd;
+      console.log(`[BorrowDashboard] Added WBTC input ${wbtcInputUsd}, new total: ${newTotal}`);
+    } else if (selectedAssetMetadata.symbol === "UNLOO" && unlooInputUsd !== null) {
+      newTotal += unlooInputUsd;
+      console.log(`[BorrowDashboard] Added UNLOO input ${unlooInputUsd}, new total: ${newTotal}`);
     } else if (selectedAssetMetadata.symbol === "USDC") {
       newTotal += currentBorrowAmountNumber;
+      console.log(`[BorrowDashboard] Added USDC input ${currentBorrowAmountNumber}, new total: ${newTotal}`);
     }
 
+    console.log(`[BorrowDashboard] Final potentialNewTotal: ${newTotal}`);
     return newTotal;
-  }, [totalBorrowedUsd, selectedAssetMetadata.symbol, ethInputUsd, wbtcInputUsd, currentBorrowAmountNumber]);
+  }, [
+    totalBorrowedUsd,
+    selectedAssetMetadata.symbol,
+    ethInputUsd,
+    wbtcInputUsd,
+    unlooInputUsd,
+    currentBorrowAmountNumber,
+  ]);
 
   // Borrowing cap constants
   const BORROWING_CAP_USD = 1.5;
   const remainingBorrowCapacity = Math.max(0, BORROWING_CAP_USD - totalBorrowedUsd);
   const isOverCap = potentialNewTotal > BORROWING_CAP_USD;
 
+  console.log(`[BorrowDashboard] Borrowing calculations:`, {
+    BORROWING_CAP_USD,
+    totalBorrowedUsd,
+    remainingBorrowCapacity,
+    potentialNewTotal,
+    isOverCap,
+  });
+
   // Transform pools data for UI
   const borrowableAssets = useMemo(() => {
-    return pools.map(pool => {
+    console.log(`[BorrowDashboard] Transforming pools data, pools length: ${pools.length}`);
+
+    const assets = pools.map((pool, index) => {
+      console.log(`[BorrowDashboard] Processing pool ${index}:`, pool);
+
       const metadata = getTokenMetadata(pool.tokenAddress);
-      return {
+      console.log(`[BorrowDashboard] Pool metadata:`, metadata);
+
+      const available = parseFloat(formatTokenAmount(pool.liquidity, metadata.decimals));
+      console.log(`[BorrowDashboard] Pool available amount:`, available);
+
+      const asset = {
         tokenAddress: pool.tokenAddress,
         symbol: metadata.symbol,
         name: metadata.name,
         iconColor: metadata.iconColor,
         imageUrl: metadata.imageUrl,
         decimals: metadata.decimals,
-        available: parseFloat(formatTokenAmount(pool.liquidity, metadata.decimals)),
+        available,
         borrowAPR: Number(pool.borrowAPR) / 100,
         depositAPR: Number(pool.depositAPR) / 100,
         liquidity: pool.liquidity,
       };
+
+      console.log(`[BorrowDashboard] Transformed asset:`, asset);
+      return asset;
     });
+
+    console.log(`[BorrowDashboard] Final borrowableAssets:`, assets);
+    return assets;
   }, [pools, formatTokenAmount]);
 
-  // Transform user borrows for UI with USD values
+  // Transform user borrows for UI with USD values INCLUDING UNLOO
   const userBorrows = useMemo(() => {
-    return userPositions.borrows.map(borrow => {
+    console.log(`[BorrowDashboard] Transforming user borrows, length: ${userPositions.borrows.length}`);
+
+    const borrows = userPositions.borrows.map((borrow, index) => {
+      console.log(`[BorrowDashboard] Processing user borrow ${index}:`, borrow);
+
       const metadata = getTokenMetadata(borrow.tokenAddress);
       const displayRepayment = getDisplayRepaymentAmount(borrow.tokenAddress);
       const principalAmount = parseFloat(formatTokenAmount(borrow.amount, metadata.decimals));
 
-      // Calculate USD value for this borrow
+      console.log(`[BorrowDashboard] Borrow calculations:`, {
+        metadata,
+        displayRepayment,
+        principalAmount,
+      });
+
+      // Calculate USD value for this borrow INCLUDING UNLOO
       let usdValue = 0;
-      if (metadata.symbol === "WETH" && ethBorrowedUsd !== null) {
-        usdValue = (ethBorrowedUsd / totalBorrowedAmounts.eth) * principalAmount || 0;
-      } else if (metadata.symbol === "WBTC" && wbtcBorrowedUsd !== null) {
-        usdValue = (wbtcBorrowedUsd / totalBorrowedAmounts.wbtc) * principalAmount || 0;
+      if (metadata.symbol === "WETH" && ethBorrowedUsd !== null && totalBorrowedAmounts.eth > 0) {
+        usdValue = (ethBorrowedUsd / totalBorrowedAmounts.eth) * principalAmount;
+        console.log(
+          `[BorrowDashboard] WETH USD value calculation: ${ethBorrowedUsd} / ${totalBorrowedAmounts.eth} * ${principalAmount} = ${usdValue}`,
+        );
+      } else if (metadata.symbol === "WBTC" && wbtcBorrowedUsd !== null && totalBorrowedAmounts.wbtc > 0) {
+        usdValue = (wbtcBorrowedUsd / totalBorrowedAmounts.wbtc) * principalAmount;
+        console.log(
+          `[BorrowDashboard] WBTC USD value calculation: ${wbtcBorrowedUsd} / ${totalBorrowedAmounts.wbtc} * ${principalAmount} = ${usdValue}`,
+        );
+      } else if (metadata.symbol === "UNLOO" && unlooBorrowedUsd !== null && totalBorrowedAmounts.unloo > 0) {
+        usdValue = (unlooBorrowedUsd / totalBorrowedAmounts.unloo) * principalAmount;
+        console.log(
+          `[BorrowDashboard] UNLOO USD value calculation: ${unlooBorrowedUsd} / ${totalBorrowedAmounts.unloo} * ${principalAmount} = ${usdValue}`,
+        );
       } else if (metadata.symbol === "USDC") {
         usdValue = principalAmount;
+        console.log(`[BorrowDashboard] USDC USD value: ${usdValue}`);
       }
 
-      return {
+      const transformedBorrow = {
         tokenAddress: borrow.tokenAddress,
         symbol: metadata.symbol,
         name: metadata.name,
@@ -188,24 +369,92 @@ export default function BorrowDashboard() {
         displayRepayment,
         usdValue,
       };
+
+      console.log(`[BorrowDashboard] Transformed borrow:`, transformedBorrow);
+      return transformedBorrow;
     });
+
+    console.log(`[BorrowDashboard] Final userBorrows:`, borrows);
+    return borrows;
   }, [
     userPositions.borrows,
     formatTokenAmount,
     getDisplayRepaymentAmount,
     ethBorrowedUsd,
     wbtcBorrowedUsd,
+    unlooBorrowedUsd,
     totalBorrowedAmounts,
   ]);
 
   const selectedAsset =
     borrowableAssets.find(asset => asset.tokenAddress === selectedTokenAddress) || borrowableAssets[0];
 
+  console.log(`[BorrowDashboard] Selected asset:`, selectedAsset);
+
+  // Add loading state tracking
+  useEffect(() => {
+    console.log(`[BorrowDashboard] Loading states changed:`, {
+      loanMasterLoading,
+      ethLoading,
+      wbtcLoading,
+      unlooLoading,
+      timestamp: new Date().toISOString(),
+    });
+  }, [loanMasterLoading, ethLoading, wbtcLoading, unlooLoading]);
+
+  // Add error tracking
+  useEffect(() => {
+    console.log(`[BorrowDashboard] Errors changed:`, {
+      loanMasterError,
+      ethError,
+      wbtcError,
+      unlooError,
+      ethInputError,
+      wbtcInputError,
+      unlooInputError,
+      timestamp: new Date().toISOString(),
+    });
+  }, [loanMasterError, ethError, wbtcError, unlooError, ethInputError, wbtcInputError, unlooInputError]);
+
+  // Add effect to log when component is stuck
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loanMasterLoading || ethLoading || wbtcLoading || unlooLoading) {
+        console.warn(`[BorrowDashboard] Component has been loading for 10+ seconds:`, {
+          loanMasterLoading,
+          ethLoading,
+          wbtcLoading,
+          unlooLoading,
+          poolsLength: pools.length,
+          userPositionsLength: userPositions.borrows.length,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }, 10000);
+
+    return () => clearTimeout(timer);
+  }, [loanMasterLoading, ethLoading, wbtcLoading, unlooLoading, pools.length, userPositions.borrows.length]);
+
   const handleBorrow = async () => {
-    if (!borrowAmount || !selectedAsset || isOverCap) return;
+    console.log(`[BorrowDashboard] handleBorrow called with:`, {
+      borrowAmount,
+      selectedAsset,
+      isOverCap,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (!borrowAmount || !selectedAsset || isOverCap) {
+      console.log(`[BorrowDashboard] handleBorrow early return:`, {
+        borrowAmountEmpty: !borrowAmount,
+        noSelectedAsset: !selectedAsset,
+        isOverCap,
+      });
+      return;
+    }
 
     setIsBorrowing(true);
     try {
+      console.log(`[BorrowDashboard] Starting borrow transaction...`);
       await borrow(selectedAsset.tokenAddress, borrowAmount, selectedAsset.decimals);
       setBorrowAmount("");
       console.log("Borrow successful!");
@@ -218,6 +467,8 @@ export default function BorrowDashboard() {
   };
 
   const handleRepay = async (tokenAddress: Address) => {
+    console.log(`[BorrowDashboard] handleRepay called for token:`, tokenAddress);
+
     setIsRepaying(prev => ({ ...prev, [tokenAddress]: true }));
     try {
       await repayBorrow(tokenAddress);
@@ -231,6 +482,8 @@ export default function BorrowDashboard() {
   };
 
   const handleRepayAll = async () => {
+    console.log(`[BorrowDashboard] handleRepayAll called for ${userBorrows.length} borrows`);
+
     for (const borrow of userBorrows) {
       try {
         await handleRepay(borrow.tokenAddress);
@@ -241,53 +494,162 @@ export default function BorrowDashboard() {
   };
 
   const handleMaxAmount = () => {
+    console.log(`[BorrowDashboard] handleMaxAmount called`);
+
     if (selectedAsset) {
       // Calculate max amount based on remaining USD capacity
       const maxUsdAmount = remainingBorrowCapacity;
       let maxTokenAmount = selectedAsset.available;
 
+      console.log(`[BorrowDashboard] Max amount calculation:`, {
+        maxUsdAmount,
+        maxTokenAmount,
+        selectedAssetSymbol: selectedAssetMetadata.symbol,
+      });
+
       if (selectedAssetMetadata.symbol === "WETH" && ethInputUsd !== null) {
-        // For ETH, we need to get the current price to calculate max tokens
         const ethPrice = currentBorrowAmountNumber > 0 ? (ethInputUsd || 0) / currentBorrowAmountNumber : 0;
         if (ethPrice > 0) {
           maxTokenAmount = Math.min(maxUsdAmount / ethPrice, selectedAsset.available);
         }
+        console.log(`[BorrowDashboard] WETH max calculation: price=${ethPrice}, maxTokenAmount=${maxTokenAmount}`);
       } else if (selectedAssetMetadata.symbol === "WBTC" && wbtcInputUsd !== null) {
-        // Similar for WBTC
         const wbtcPrice = currentBorrowAmountNumber > 0 ? (wbtcInputUsd || 0) / currentBorrowAmountNumber : 0;
         if (wbtcPrice > 0) {
           maxTokenAmount = Math.min(maxUsdAmount / wbtcPrice, selectedAsset.available);
         }
+        console.log(`[BorrowDashboard] WBTC max calculation: price=${wbtcPrice}, maxTokenAmount=${maxTokenAmount}`);
+      } else if (selectedAssetMetadata.symbol === "UNLOO" && unlooInputUsd !== null) {
+        const unlooPrice = currentBorrowAmountNumber > 0 ? (unlooInputUsd || 0) / currentBorrowAmountNumber : 0;
+        if (unlooPrice > 0) {
+          maxTokenAmount = Math.min(maxUsdAmount / unlooPrice, selectedAsset.available);
+        }
+        console.log(`[BorrowDashboard] UNLOO max calculation: price=${unlooPrice}, maxTokenAmount=${maxTokenAmount}`);
       } else if (selectedAssetMetadata.symbol === "USDC") {
-        // USDC is 1:1 with USD
         maxTokenAmount = Math.min(maxUsdAmount, selectedAsset.available);
+        console.log(`[BorrowDashboard] USDC max calculation: maxTokenAmount=${maxTokenAmount}`);
       }
 
-      setBorrowAmount(Math.max(0, maxTokenAmount).toFixed(6));
+      const finalAmount = Math.max(0, maxTokenAmount).toFixed(6);
+      console.log(`[BorrowDashboard] Setting max amount to: ${finalAmount}`);
+      setBorrowAmount(finalAmount);
     }
   };
 
-  if (isLoading || ethLoading || wbtcLoading) {
+  console.log(`[BorrowDashboard] About to check loading condition:`, {
+    loanMasterLoading,
+    ethLoading,
+    wbtcLoading,
+    unlooLoading,
+    shouldShowLoading: loanMasterLoading || ethLoading || wbtcLoading || unlooLoading,
+  });
+
+  if (loanMasterLoading || ethLoading || wbtcLoading || unlooLoading) {
+    console.log(`[BorrowDashboard] Rendering loading state`);
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex flex-col items-center justify-center p-8">
         <div className="loading loading-spinner loading-lg"></div>
+        <div className="text-sm text-gray-600 mt-4">
+          Loading...
+          {loanMasterLoading && " (Contract data)"}
+          {ethLoading && " (ETH prices)"}
+          {wbtcLoading && " (WBTC prices)"}
+          {unlooLoading && " (UNLOO prices)"}
+        </div>
+        <div className="text-xs text-gray-400 mt-2 max-w-md text-center">
+          Mainnet operations may take longer due to network congestion.
+          {isMounted && (
+            <>
+              <br />
+              Current time: {new Date().toLocaleTimeString()}
+            </>
+          )}
+        </div>
+        {/* Debug info in loading state */}
+        {isMounted && (
+          <div className="mt-4 text-xs text-gray-500 bg-gray-100 p-2 rounded max-w-lg">
+            <div>LoanMaster: {loanMasterLoading ? "Loading..." : "Ready"}</div>
+            <div>ETH Price: {ethLoading ? "Loading..." : "Ready"}</div>
+            <div>WBTC Price: {wbtcLoading ? "Loading..." : "Ready"}</div>
+            <div>UNLOO Price: {unlooLoading ? "Loading..." : "Ready"}</div>
+            <div>Pools: {pools.length}</div>
+            <div>User Borrows: {userPositions.borrows.length}</div>
+            {loanMasterError && <div className="text-red-600">Error: {loanMasterError}</div>}
+            {(ethError || wbtcError || unlooError) && (
+              <div className="text-red-600">Price Error: {ethError || wbtcError || unlooError}</div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
 
-  if (error) {
+  console.log(`[BorrowDashboard] Checking for errors:`, {
+    loanMasterError,
+    hasError: !!loanMasterError,
+  });
+
+  if (loanMasterError) {
+    console.log(`[BorrowDashboard] Rendering error state`);
     return (
       <div className="flex items-center justify-center p-8">
         <div className="alert alert-error">
           <ExclamationTriangleIcon className="h-6 w-6" />
-          <span>Error: {error}</span>
+          <span>Error: {loanMasterError}</span>
         </div>
       </div>
     );
   }
 
+  console.log(`[BorrowDashboard] Rendering main component`);
+
   return (
     <div className="flex flex-col items-center w-full bg-secondary">
+      {/* Development Debug Panel */}
+      {process.env.NODE_ENV === "development" && isMounted && (
+        <div className="w-full bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-xs">
+          <details>
+            <summary className="font-medium cursor-pointer">🐛 Debug Info (Development Only)</summary>
+            <div className="mt-2 space-y-1">
+              <div>
+                <strong>Timestamp:</strong> {new Date().toISOString()}
+              </div>
+              <div>
+                <strong>Loading States:</strong> LoanMaster={loanMasterLoading.toString()}, ETH={ethLoading.toString()},
+                WBTC={wbtcLoading.toString()}, UNLOO={unlooLoading.toString()}
+              </div>
+              <div>
+                <strong>Data Counts:</strong> Pools={pools.length}, Borrows={userPositions.borrows.length}
+              </div>
+              <div>
+                <strong>Price Values:</strong> ETH=${ethBorrowedUsd?.toFixed(2) || "null"}, WBTC=$
+                {wbtcBorrowedUsd?.toFixed(2) || "null"}, UNLOO=${unlooBorrowedUsd?.toFixed(2) || "null"}
+              </div>
+              <div>
+                <strong>Total Borrowed USD:</strong> ${totalBorrowedUsd.toFixed(2)}
+              </div>
+              <div>
+                <strong>Borrowable Assets:</strong> {borrowableAssets.length}
+              </div>
+              <div>
+                <strong>Selected Asset:</strong> {selectedAsset?.symbol || "none"}
+              </div>
+              <div>
+                <strong>Errors:</strong> LoanMaster={loanMasterError || "none"}, ETH={ethError || "none"}, WBTC=
+                {wbtcError || "none"}, UNLOO={unlooError || "none"}
+              </div>
+              <div>
+                <strong>Token Addresses:</strong>
+              </div>
+              <div className="ml-4">USDC: {TOKEN_ADDRESSES.USDC}</div>
+              <div className="ml-4">WETH: {TOKEN_ADDRESSES.WETH}</div>
+              <div className="ml-4">WBTC: {TOKEN_ADDRESSES.WBTC}</div>
+              <div className="ml-4">UNLOO: {TOKEN_ADDRESSES.UNLOO}</div>
+            </div>
+          </details>
+        </div>
+      )}
+
       {/* Borrowing Cap Display */}
       <div className="w-full bg-base-100 rounded-xl border border-gray-100 shadow-sm mb-6">
         <div className="p-4 border-b border-gray-100">
@@ -601,9 +963,11 @@ export default function BorrowDashboard() {
                                 ? ethInputUsd.toFixed(2)
                                 : selectedAssetMetadata.symbol === "WBTC" && wbtcInputUsd !== null
                                   ? wbtcInputUsd.toFixed(2)
-                                  : selectedAssetMetadata.symbol === "USDC"
-                                    ? currentBorrowAmountNumber.toFixed(2)
-                                    : "0.00"}
+                                  : selectedAssetMetadata.symbol === "UNLOO" && unlooInputUsd !== null
+                                    ? unlooInputUsd.toFixed(2)
+                                    : selectedAssetMetadata.symbol === "USDC"
+                                      ? currentBorrowAmountNumber.toFixed(2)
+                                      : "0.00"}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -663,9 +1027,11 @@ export default function BorrowDashboard() {
                             ? ethInputUsd.toFixed(2)
                             : selectedAssetMetadata.symbol === "WBTC" && wbtcInputUsd !== null
                               ? wbtcInputUsd.toFixed(2)
-                              : selectedAssetMetadata.symbol === "USDC"
-                                ? currentBorrowAmountNumber.toFixed(2)
-                                : "0.00"}
+                              : selectedAssetMetadata.symbol === "UNLOO" && unlooInputUsd !== null
+                                ? unlooInputUsd.toFixed(2)
+                                : selectedAssetMetadata.symbol === "USDC"
+                                  ? currentBorrowAmountNumber.toFixed(2)
+                                  : "0.00"}
                         </div>
                       )}
                   </div>
