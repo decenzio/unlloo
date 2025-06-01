@@ -625,7 +625,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
           {/* Tips & Next Steps */}
           <motion.div variants={containerVariants} initial="hidden" animate="visible" className="text-center">
             <motion.p variants={itemVariants} className="text-sm text-gray-600 max-w-md mx-auto">
-              Level up to unlock new perks, badges, and on-chain reputation power.
+              <small>Level up to unlock new perks, badges, and on-chain reputation power.</small>
               <br />
               <Link href="/improve-score" className="text-indigo-600 hover:underline font-medium mt-2 inline-block">
                 How to improve your score →

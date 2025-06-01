@@ -1,53 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { Address } from "viem";
 import { useAccount } from "wagmi";
+import { CryptoIcon } from "~~/components/custom/cryptoIcon";
 import { TOKEN_ADDRESSES, getTokenMetadata, useLoanMaster } from "~~/hooks/custom/useLoanMaster";
 import { notification } from "~~/utils/scaffold-eth";
 
-// Enhanced crypto icon component
-const CryptoIcon = ({
-  symbol,
-  color,
-  imageUrl,
-  size = 24,
-}: {
-  symbol: string;
-  color: string;
-  imageUrl?: string;
-  size?: number;
-}) => {
-  const [imageError, setImageError] = useState(false);
-
-  if (imageUrl && !imageError) {
-    return (
-      <Image
-        src={imageUrl}
-        alt={symbol}
-        className="rounded-full object-cover"
-        style={{ width: size, height: size }}
-        onError={() => setImageError(true)}
-        onLoad={() => setImageError(false)}
-      />
-    );
-  }
-
-  return (
-    <div
-      className="rounded-full flex items-center justify-center text-white font-bold text-xs"
-      style={{
-        backgroundColor: color,
-        width: size,
-        height: size,
-        fontSize: size * 0.35,
-      }}
-    >
-      {symbol.slice(0, 3)}
-    </div>
-  );
-};
+// Remove the inline CryptoIcon component definition here
 
 const EarnPage = () => {
   const { address: connectedAddress } = useAccount();
