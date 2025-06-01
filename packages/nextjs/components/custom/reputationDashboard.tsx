@@ -1,6 +1,6 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
 import { normalize } from "viem/ens";
@@ -9,6 +9,8 @@ import {
   ArrowUpIcon,
   ChartBarIcon,
   CurrencyDollarIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
   MapIcon,
   SparklesIcon,
   StarIcon,
@@ -21,14 +23,29 @@ import { useReputationScore } from "~~/hooks/custom/useReputationScore";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
 
-// import { StarIcon as StarOutlineIcon } from "@heroicons/react/24/outline";
+// Constants
+const LOADING_TIMEOUT_MS = 10000;
+const LEVEL_THRESHOLDS = {
+  LEGENDARY: 90,
+  EXPERT: 70,
+  ADVANCED: 50,
+  INTERMEDIATE: 30,
+  NEWCOMER: 0,
+} as const;
 
+const BORROWING_LIMITS = {
+  ALPHA_VERSION: 1.5,
+  PRODUCTION_MULTIPLIER: 0.1, // Future: borrowLimit = score * multiplier
+} as const;
+
+// Types
 interface ReputationMetric {
   label: string;
   score: number;
   color: string;
   bgColor: string;
   progressColor: string;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 interface LeaderboardUser {
@@ -41,7 +58,6 @@ interface ReputationDashboardProps {
   leaderboard?: LeaderboardUser[];
 }
 
-// Define the structure of reputation score data
 interface ReputationScoreData {
   overall: number;
   riskLevel: number;
@@ -56,16 +72,105 @@ interface ReputationScoreData {
   recommendations?: string[];
 }
 
-// Helper function to get level information based on score
-const getLevelInfo = (score: number) => {
-  if (score >= 90) return { level: 5, title: "LEGENDARY", progress: 100 };
-  if (score >= 70) return { level: 4, title: "EXPERT", progress: ((score - 70) / 20) * 100 };
-  if (score >= 50) return { level: 3, title: "ADVANCED", progress: ((score - 50) / 20) * 100 };
-  if (score >= 30) return { level: 2, title: "INTERMEDIATE", progress: ((score - 30) / 20) * 100 };
-  return { level: 1, title: "NEWCOMER", progress: (score / 30) * 100 };
+interface LevelInfo {
+  level: number;
+  title: string;
+  progress: number;
+  nextLevelAt?: number;
+  pointsToNext?: number;
+}
+
+interface Achievement {
+  key: string;
+  label: string;
+  description?: string;
+  rarity?: "common" | "rare" | "epic" | "legendary";
+}
+
+// Logging utility
+const logger = {
+  info: (message: string, data?: any) => {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[ReputationDashboard] ${message}`, data);
+    }
+  },
+  error: (message: string, error?: any) => {
+    console.error(`[ReputationDashboard] ${error}`);
+  },
+  warn: (message: string, data?: any) => {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[ReputationDashboard] ${message}`, data);
+    }
+  },
 };
 
-// Helper function to convert reputation score to dashboard metrics
+// Enhanced achievements with descriptions and rarity
+const SPECIFIC_ACHIEVEMENTS: Achievement[] = [
+  {
+    key: "ens",
+    label: "ENS Domain Owner",
+    description: "You own an ENS domain name",
+    rarity: "rare",
+  },
+  {
+    key: "wordId",
+    label: "WorldID Verified",
+    description: "Verified human identity through WorldID",
+    rarity: "epic",
+  },
+  {
+    key: "defi",
+    label: "DeFi Enthusiast",
+    description: "Active participant in DeFi protocols",
+    rarity: "common",
+  },
+];
+
+const DEFAULT_LEADERBOARD: LeaderboardUser[] = [
+  { name: "Philip", score: 8.21 },
+  { name: "Ellen", score: 3.5 },
+];
+
+// Enhanced helper function to get level information
+const getLevelInfo = (score: number): LevelInfo => {
+  const levels = [
+    { threshold: LEVEL_THRESHOLDS.LEGENDARY, title: "LEGENDARY", level: 5 },
+    { threshold: LEVEL_THRESHOLDS.EXPERT, title: "EXPERT", level: 4 },
+    { threshold: LEVEL_THRESHOLDS.ADVANCED, title: "ADVANCED", level: 3 },
+    { threshold: LEVEL_THRESHOLDS.INTERMEDIATE, title: "INTERMEDIATE", level: 2 },
+    { threshold: LEVEL_THRESHOLDS.NEWCOMER, title: "NEWCOMER", level: 1 },
+  ];
+
+  for (let i = 0; i < levels.length; i++) {
+    const currentLevel = levels[i];
+    const nextLevel = levels[i - 1];
+
+    if (score >= currentLevel.threshold) {
+      const progressStart = currentLevel.threshold;
+      const progressEnd = nextLevel?.threshold || 100;
+      const progress = nextLevel ? ((score - progressStart) / (progressEnd - progressStart)) * 100 : 100;
+
+      return {
+        level: currentLevel.level,
+        title: currentLevel.title,
+        progress: Math.min(progress, 100),
+        nextLevelAt: nextLevel?.threshold,
+        pointsToNext: nextLevel ? Math.max(0, nextLevel.threshold - score) : 0,
+      };
+    }
+  }
+
+  // Fallback for scores below 0
+  return {
+    level: 1,
+    title: "NEWCOMER",
+    progress: Math.max(0, (score / LEVEL_THRESHOLDS.INTERMEDIATE) * 100),
+    nextLevelAt: LEVEL_THRESHOLDS.INTERMEDIATE,
+    pointsToNext: Math.max(0, LEVEL_THRESHOLDS.INTERMEDIATE - score),
+  };
+};
+
+// Enhanced function to convert reputation score to dashboard metrics
 const convertToReputationMetrics = (reputationScore: ReputationScoreData): ReputationMetric[] => {
   return [
     {
@@ -76,11 +181,11 @@ const convertToReputationMetrics = (reputationScore: ReputationScoreData): Reput
       progressColor: "#10B981",
     },
     {
-      label: "DEFI",
+      label: "DeFi",
       score: reputationScore.components.defiReputation,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
-      progressColor: "#3B9FF6FF",
+      progressColor: "#3B82F6",
     },
     {
       label: "Governance",
@@ -90,7 +195,7 @@ const convertToReputationMetrics = (reputationScore: ReputationScoreData): Reput
       progressColor: "#8B5CF6",
     },
     {
-      label: "NFTs",
+      label: "Assets",
       score: reputationScore.components.financialCapacity,
       color: "text-yellow-600",
       bgColor: "bg-yellow-100",
@@ -98,14 +203,14 @@ const convertToReputationMetrics = (reputationScore: ReputationScoreData): Reput
     },
     {
       label: "POAPs",
-      score: 0, // Placeholder for POAPs, can be replaced with actual data
+      score: 0, // Placeholder for future implementation
       color: "text-pink-600",
       bgColor: "bg-pink-100",
       progressColor: "#EC4899",
     },
     {
-      label: "Connections",
-      score: 0, // Placeholder for connections, can be replaced with actual data
+      label: "Network",
+      score: 0, // Placeholder for future implementation
       color: "text-orange-600",
       bgColor: "bg-orange-100",
       progressColor: "#F97316",
@@ -113,56 +218,38 @@ const convertToReputationMetrics = (reputationScore: ReputationScoreData): Reput
   ];
 };
 
-const DEFAULT_LEADERBOARD: LeaderboardUser[] = [
-  { name: "Philip", score: 8.21 },
-  { name: "Ellen", score: 3.5 },
-];
+// Custom hooks
+const useLoadingTimeout = (isLoading: boolean, timeoutMs: number = LOADING_TIMEOUT_MS) => {
+  const [isTimedOut, setIsTimedOut] = useState(false);
 
-// Define your 3 specific achievements
-const SPECIFIC_ACHIEVEMENTS = [
-  { key: "ens", label: "ENS Domain Owner" },
-  { key: "wordId", label: "WorldID Verified" },
-  { key: "defi", label: "DeFi Enthusiast" },
-];
+  useEffect(() => {
+    if (!isLoading) {
+      setIsTimedOut(false);
+      return;
+    }
 
-export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD }: ReputationDashboardProps) {
-  // Get wallet information using wagmi hooks
-  const { address, isConnected } = useAccount();
-  const { data: ensName } = useEnsName({ address });
-  const { data: ensAvatar } = useEnsAvatar({
-    name: ensName ? normalize(ensName) : undefined,
-    chainId: 1,
-    query: {
-      enabled: Boolean(ensName),
-      gcTime: 30_000,
-    },
-  });
-  const { targetNetwork } = useTargetNetwork();
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        setIsTimedOut(true);
+        logger.warn("Loading timeout reached");
+      }
+    }, timeoutMs);
 
-  // Use the reputation score hook
-  const { reputationScore, loading, error, refetch } = useReputationScore();
+    return () => clearTimeout(timer);
+  }, [isLoading, timeoutMs]);
 
-  // Info card state for metrics
-  const [openInfo, setOpenInfo] = useState<string | null>(null);
+  return isTimedOut;
+};
 
-  // Generate block explorer link based on address and current network
-  const blockExplorerAddressLink = useMemo(() => {
-    return address ? getBlockExplorerAddressLink(targetNetwork, address) : undefined;
-  }, [address, targetNetwork]);
-
-  // Display name fallback logic
-  const displayName = useMemo(() => {
-    return ensName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Guest");
-  }, [ensName, address]);
-
-  // Calculate derived values from reputation score
-  const derivedValues = useMemo(() => {
+const useReputationCalculations = (reputationScore: ReputationScoreData | null, isConnected: boolean) => {
+  return useMemo(() => {
     if (!reputationScore) {
       return {
         overallScore: 0,
-        levelInfo: { level: 1, title: "NEWCOMER", progress: 0 },
+        levelInfo: getLevelInfo(0),
         reputationMetrics: [],
         achievements: [],
+        borrowingLimit: BORROWING_LIMITS.ALPHA_VERSION,
       };
     }
 
@@ -178,18 +265,153 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
     if (reputationScore.components.daoActivity > 50) achievements.push("DAO Participant");
     if (reputationScore.riskLevel >= 8) achievements.push("Low Risk Profile");
 
+    // Future: Dynamic borrowing limit based on score
+    const borrowingLimit =
+      process.env.NODE_ENV === "production"
+        ? Math.max(BORROWING_LIMITS.ALPHA_VERSION, reputationScore.overall * BORROWING_LIMITS.PRODUCTION_MULTIPLIER)
+        : BORROWING_LIMITS.ALPHA_VERSION;
+
     return {
       overallScore: reputationScore.overall,
       levelInfo,
       reputationMetrics,
       achievements,
+      borrowingLimit,
     };
-  }, [reputationScore]);
+  }, [reputationScore, isConnected]);
+};
 
-  // Extract level information for easy access
-  const { level, title: levelTitle, progress: levelProgress } = derivedValues.levelInfo;
+// Enhanced Info Card Component
+const InfoCard = React.memo(({ label, content, onClose }: { label: string; content: string; onClose: () => void }) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.8, y: -10 }}
+    animate={{ opacity: 1, scale: 1, y: 0 }}
+    exit={{ opacity: 0, scale: 0.8, y: -10 }}
+    transition={{ duration: 0.2 }}
+    className="absolute z-50 top-0 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 rounded-lg shadow-lg p-3 w-48 text-xs text-gray-700"
+  >
+    <div className="flex items-center justify-between mb-1">
+      <div className="font-semibold">{label}</div>
+      <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close info">
+        ×
+      </button>
+    </div>
+    <div className="text-gray-600">{content}</div>
+  </motion.div>
+));
 
-  // Update leaderboard to include current user
+InfoCard.displayName = "InfoCard";
+
+// Enhanced Metric Card Component
+const MetricCard = React.memo(
+  ({
+    metric,
+    onInfoToggle,
+    showInfo,
+    infoContent,
+  }: {
+    metric: ReputationMetric;
+    onInfoToggle: (label: string) => void;
+    showInfo: boolean;
+    infoContent: string;
+  }) => {
+    const { label, score, color, bgColor, progressColor } = metric;
+
+    return (
+      <motion.div
+        variants={{
+          hidden: { y: 20, opacity: 0 },
+          visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 } },
+        }}
+        className="relative flex flex-col items-center bg-white rounded-xl p-4 shadow-sm transition-all duration-200 hover:shadow-md"
+      >
+        <div className={`w-24 h-24 ${bgColor} rounded-full flex items-center justify-center p-2.5 mb-3`}>
+          <CircularProgressbar
+            value={score}
+            maxValue={100}
+            text={`${score}`}
+            styles={buildStyles({
+              textSize: "28px",
+              textColor: color.replace("text-", "#").replace("-600", ""),
+              pathColor: progressColor,
+              trailColor: "rgba(229, 231, 235, 0.8)",
+              strokeLinecap: "round",
+              pathTransitionDuration: 0.8,
+            })}
+          />
+        </div>
+        <div className="flex flex-col items-center">
+          <div className={`font-bold text-base ${color} flex items-center gap-1`}>
+            {label}
+            <button
+              type="button"
+              aria-label={`Info about ${label}`}
+              onClick={() => onInfoToggle(label)}
+              className="ml-1 cursor-pointer hover:text-indigo-600 transition-colors"
+            >
+              <InformationCircleIcon className="w-4 h-4" />
+            </button>
+          </div>
+          <AnimatePresence>
+            {showInfo && <InfoCard label={label} content={infoContent} onClose={() => onInfoToggle(label)} />}
+          </AnimatePresence>
+          <div className="text-xs text-gray-500 mt-1">
+            {score < 30 ? "Building" : score < 60 ? "Advancing" : "Expert"}
+          </div>
+        </div>
+      </motion.div>
+    );
+  },
+);
+
+MetricCard.displayName = "MetricCard";
+
+// Main Component
+export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD }: ReputationDashboardProps) {
+  logger.info("Component render started");
+
+  // Wallet and network information
+  const { address, isConnected } = useAccount();
+  const { data: ensName } = useEnsName({ address });
+  const { data: ensAvatar } = useEnsAvatar({
+    name: ensName ? normalize(ensName) : undefined,
+    chainId: 1,
+    query: {
+      enabled: Boolean(ensName),
+      gcTime: 30_000,
+    },
+  });
+  const { targetNetwork } = useTargetNetwork();
+
+  // Reputation data
+  const { reputationScore, loading, error, refetch } = useReputationScore();
+
+  // Component state
+  const [openInfo, setOpenInfo] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Set mounted flag
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Check for loading timeout
+  const isLoadingTimedOut = useLoadingTimeout(loading);
+
+  // Memoized calculations
+  const blockExplorerAddressLink = useMemo(() => {
+    return address ? getBlockExplorerAddressLink(targetNetwork, address) : undefined;
+  }, [address, targetNetwork]);
+
+  const displayName = useMemo(() => {
+    return ensName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Guest");
+  }, [ensName, address]);
+
+  const { overallScore, levelInfo, reputationMetrics, achievements, borrowingLimit } = useReputationCalculations(
+    reputationScore,
+    isConnected,
+  );
+
   const updatedLeaderboard = useMemo(() => {
     if (!reputationScore || !isConnected) return leaderboard;
 
@@ -202,6 +424,20 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
       },
     ].sort((a, b) => b.score - a.score);
   }, [leaderboard, reputationScore, isConnected, displayName]);
+
+  // Info texts for each metric
+  const metricInfo: Record<string, string> = useMemo(
+    () => ({
+      "Onchain Activity":
+        "Reflects your on-chain activity and longevity. The higher, the more established your address.",
+      DeFi: "Shows your engagement with DeFi protocols. Interact with DeFi to grow this score.",
+      Governance: "Measures your participation in DAOs and governance. Get involved to increase it.",
+      Assets: "Represents your wallet diversity and asset holdings. More variety and value means a higher score.",
+      POAPs: "COMING SOON — Counts your POAPs, showcasing your participation in events and communities.",
+      Network: "COMING SOON — Indicates your network strength and connections with other users.",
+    }),
+    [],
+  );
 
   // Animation variants
   const containerVariants = useMemo(
@@ -227,23 +463,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
     [],
   );
 
-  // Info texts for each metric
-  const metricInfo: Record<string, string> = useMemo(
-    () => ({
-      "Onchain Activity":
-        "Reflects your on-chain activity and longevity. The higher, the more established your address.",
-      NFTs: "Shows your engagement with DeFi protocols. Interact with DeFi to grow this score.",
-      DEFI: "Measures your participation in DAOs and governance. Get involved to increase it.",
-      Governance: "Represents your wallet diversity and asset holdings. More variety and value means a higher score.",
-      POAPs:
-        "COMING SOON --- Counts your POAPs, showcasing your participation in events and communities. Collect more to boost this.",
-      Connections:
-        "COMING SOON --- Indicates your network strength and connections with other users. Engage with others to improve this.",
-    }),
-    [],
-  );
-
-  // Memoized click handlers
+  // Event handlers
   const handleInfoToggle = useCallback(
     (label: string) => {
       setOpenInfo(openInfo === label ? null : label);
@@ -251,20 +471,108 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
     [openInfo],
   );
 
-  const handleInfoClose = useCallback(() => {
-    setOpenInfo(null);
-  }, []);
-
   const handleRetry = useCallback(() => {
     if (refetch) {
       refetch();
     }
   }, [refetch]);
 
-  // @ts-ignore
+  // Loading state
+  if (loading) {
+    return (
+      <div className="text-black w-full font-sans">
+        <div className="flex flex-col items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Calculating your reputation score...</p>
+          <div className="text-xs text-gray-400 mt-2 max-w-md text-center">
+            Analyzing your Web3 activity and reputation metrics...
+            {isMounted && (
+              <>
+                <br />
+                Current time: {new Date().toLocaleTimeString()}
+              </>
+            )}
+          </div>
+
+          {isLoadingTimedOut && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+              ⚠️ Loading is taking longer than expected. Please check your connection.
+            </div>
+          )}
+
+          {/* Debug info only in development */}
+          {process.env.NODE_ENV === "development" && isMounted && (
+            <div className="mt-4 text-xs text-gray-500 bg-gray-100 p-2 rounded max-w-lg">
+              <div>Status: Loading reputation data...</div>
+              <div>Connected: {isConnected ? "Yes" : "No"}</div>
+              <div>Address: {address || "None"}</div>
+              {error && <div className="text-red-600">Error: {error}</div>}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="text-black w-full font-sans">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+          <div className="flex items-center gap-3 mb-3">
+            <ExclamationTriangleIcon className="h-6 w-6 text-red-500" />
+            <h3 className="text-lg font-medium text-red-800">Error Loading Reputation</h3>
+          </div>
+          <p className="text-red-700 mb-3">Error: {error}</p>
+          <button
+            onClick={handleRetry}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="text-black w-full font-sans">
-      {/* Welcome Banner */}
+      {/* Development Debug Panel */}
+      {process.env.NODE_ENV === "development" && isMounted && (
+        <div className="w-full bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-xs">
+          <details>
+            <summary className="font-medium cursor-pointer">🐛 Debug Info (Development Only)</summary>
+            <div className="mt-2 space-y-1">
+              <div>
+                <strong>Timestamp:</strong> {new Date().toISOString()}
+              </div>
+              <div>
+                <strong>Overall Score:</strong> {overallScore}
+              </div>
+              <div>
+                <strong>Level:</strong> {levelInfo.level} - {levelInfo.title}
+              </div>
+              <div>
+                <strong>Progress:</strong> {levelInfo.progress.toFixed(1)}%
+              </div>
+              <div>
+                <strong>Borrowing Limit:</strong> ${borrowingLimit.toFixed(2)}
+              </div>
+              <div>
+                <strong>Achievements:</strong> {achievements.length}
+              </div>
+              <div>
+                <strong>Connected:</strong> {isConnected ? "Yes" : "No"}
+              </div>
+              <div>
+                <strong>Address:</strong> {address || "None"}
+              </div>
+            </div>
+          </details>
+        </div>
+      )}
+
+      {/* Enhanced Welcome Banner */}
       <motion.div
         initial={{ x: -50, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
@@ -285,7 +593,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                       href={blockExplorerAddressLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline underline-offset-2 ml-2"
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline underline-offset-2 ml-2 transition-colors"
                     >
                       View on Explorer
                     </a>
@@ -304,22 +612,30 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
         </div>
 
         <div className="flex flex-col sm:flex-row items-center sm:items-stretch gap-6 mb-3 w-full">
-          {/* Level Number (left) */}
+          {/* Enhanced Level Display */}
           <div className="w-18 h-18 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-3xl flex items-center justify-center shadow flex-shrink-0">
-            {String(level).padStart(2, "0")}
+            {String(levelInfo.level).padStart(2, "0")}
           </div>
 
-          {/* Level Info & Progress Bar (right) */}
+          {/* Enhanced Level Info & Progress Bar */}
           <div className="flex-1 flex flex-col justify-center w-full">
-            <div className="text-lg font-bold text-indigo-800">{levelTitle}</div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-lg font-bold text-indigo-800">{levelInfo.title}</div>
+              {levelInfo.nextLevelAt && (
+                <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                  {levelInfo.pointsToNext} pts to next level
+                </span>
+              )}
+            </div>
             <div className="">
               <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>{Math.round(levelProgress)}%</span>
+                <span>{Math.round(levelInfo.progress)}%</span>
+                {levelInfo.nextLevelAt && <span className="text-xs">Next: {levelInfo.nextLevelAt} pts</span>}
               </div>
               <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${levelProgress}%` }}
+                  animate={{ width: `${levelInfo.progress}%` }}
                   transition={{ duration: 1, ease: "easeOut" }}
                   className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full"
                 />
@@ -331,44 +647,12 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             </div>
           </div>
         </div>
-
-        {/* Status Messages */}
-        {loading && (
-          <div className="text-center">
-            <span className="text-xs text-indigo-600">Loading reputation...</span>
-          </div>
-        )}
-        {error && (
-          <div className="text-center">
-            <button onClick={handleRetry} className="text-xs text-red-600 hover:text-red-800 font-medium underline">
-              Retry
-            </button>
-          </div>
-        )}
       </motion.div>
 
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Calculating your reputation score...</p>
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-          <p className="text-red-700">Error: {error}</p>
-          <button onClick={handleRetry} className="mt-2 text-red-600 hover:text-red-800 font-medium underline">
-            Try again
-          </button>
-        </div>
-      )}
-
-      {/* Main Content - Only show if we have data or user is not connected */}
+      {/* Main Content */}
       {(!isConnected || reputationScore) && (
         <>
-          {/* Overall Score & Level Section */}
+          {/* Enhanced Overall Score & Level Section */}
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -378,17 +662,17 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             {/* Overall Score */}
             <motion.div
               variants={itemVariants}
-              className="flex flex-col items-center bg-white rounded-xl p-5 shadow-sm border"
+              className="flex flex-col items-center bg-white rounded-xl p-5 shadow-sm border hover:shadow-md transition-shadow"
             >
               <h3 className="text-lg font-medium text-gray-700 mb-3">Overall Score</h3>
               <div className="w-32 h-32 mb-3">
                 <CircularProgressbar
-                  value={derivedValues.overallScore}
+                  value={overallScore}
                   maxValue={100}
-                  text={`${derivedValues.overallScore}`}
+                  text={`${overallScore}`}
                   styles={buildStyles({
                     textSize: "28px",
-                    pathColor: `rgba(101, 116, 205, ${derivedValues.overallScore / 100})`,
+                    pathColor: `rgba(101, 116, 205, ${overallScore / 100})`,
                     textColor: "#4338CA",
                     trailColor: "#E5E7EB",
                     pathTransitionDuration: 1,
@@ -396,22 +680,28 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                 />
               </div>
               <div className="text-sm text-center text-gray-600">
-                {derivedValues.overallScore < 30
+                {overallScore < 30
                   ? "Building reputation..."
-                  : derivedValues.overallScore < 60
+                  : overallScore < 60
                     ? "Good standing!"
                     : "Excellent reputation!"}
               </div>
             </motion.div>
 
-            {/* Max Borrow */}
-            <motion.div variants={itemVariants} className="flex flex-col bg-white rounded-xl p-5 shadow-sm border">
+            {/* Enhanced Max Borrow */}
+            <motion.div
+              variants={itemVariants}
+              className="flex flex-col bg-white rounded-xl p-5 shadow-sm border hover:shadow-md transition-shadow"
+            >
               <div className="flex items-center gap-2 mb-3">
                 <CurrencyDollarIcon className="w-5 h-5 text-indigo-600 flex-shrink-0" />
                 <span className="text-lg font-medium text-gray-700 flex items-center">Max Borrow</span>
               </div>
               <div className="text-2xl font-bold text-indigo-700 mb-1">
-                $1.5 <small className="text-xs text-gray-400">(Alfa version limit)</small>
+                ${borrowingLimit.toFixed(2)}
+                <small className="text-xs text-gray-400 ml-2">
+                  {process.env.NODE_ENV === "production" ? "(Dynamic)" : "(Alpha limit)"}
+                </small>
               </div>
               <div className="text-sm text-gray-600">
                 Your current maximum borrow limit based on your reputation score.
@@ -422,8 +712,11 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
               </div>
             </motion.div>
 
-            {/* Achievements section */}
-            <motion.div variants={itemVariants} className="bg-white rounded-xl p-5 shadow-sm border">
+            {/* Enhanced Achievements section */}
+            <motion.div
+              variants={itemVariants}
+              className="bg-white rounded-xl p-5 shadow-sm border hover:shadow-md transition-shadow"
+            >
               <div className="flex items-center gap-2 mb-4 text-amber-600 font-semibold">
                 <TrophyIcon className="w-5 h-5 flex-shrink-0" />
                 <span className="text-lg flex items-center">Achievements</span>
@@ -431,14 +724,13 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
 
               <ul className="space-y-3">
                 {SPECIFIC_ACHIEVEMENTS.map(ach => {
-                  // Determine if the user has this achievement
                   let hasAchievement = false;
                   if (ach.key === "ens") hasAchievement = !!reputationScore?.ens;
                   if (ach.key === "wordId") hasAchievement = !!reputationScore?.wordId;
                   if (ach.key === "defi") hasAchievement = (reputationScore?.components?.defiReputation ?? 0) > 50;
 
                   return (
-                    <li key={ach.key} className="flex items-center gap-2 text-sm">
+                    <li key={ach.key} className="flex items-center gap-2 text-sm group">
                       {hasAchievement ? (
                         <span className="w-6 h-6 flex items-center justify-center rounded bg-amber-100">
                           <StarSolidIcon className="w-5 h-5 text-amber-400" />
@@ -446,18 +738,21 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                       ) : (
                         <span className="w-6 h-6 flex items-center justify-center rounded border border-gray-300 bg-white" />
                       )}
-                      <span className={`font-medium ${hasAchievement ? "text-gray-800" : "text-gray-400"}`}>
-                        {ach.label}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className={`font-medium ${hasAchievement ? "text-gray-800" : "text-gray-400"}`}>
+                          {ach.label}
+                        </span>
+                        {ach.description && <span className="text-xs text-gray-500">{ach.description}</span>}
+                      </div>
                     </li>
                   );
                 })}
               </ul>
 
-              {/* Optionally, show other achievements as before */}
-              {derivedValues.achievements.length > 0 && (
-                <ul className="space-y-3 mt-4">
-                  {derivedValues.achievements
+              {/* Additional achievements */}
+              {achievements.length > 0 && (
+                <ul className="space-y-3 mt-4 pt-4 border-t border-gray-100">
+                  {achievements
                     .filter(a => !SPECIFIC_ACHIEVEMENTS.some(s => s.label === a))
                     .map(achievement => (
                       <li key={achievement} className="flex items-center gap-2 text-sm">
@@ -470,14 +765,14 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
 
               <Link
                 href="/achievements"
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium mt-4 inline-block"
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium mt-4 inline-block transition-colors"
               >
                 View all achievements →
               </Link>
             </motion.div>
           </motion.div>
 
-          {/* Reputation Metrics */}
+          {/* Enhanced Reputation Metrics */}
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -490,67 +785,14 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-              {derivedValues.reputationMetrics.map(({ label, score, color, bgColor, progressColor }) => (
-                <motion.div
-                  key={label}
-                  variants={itemVariants}
-                  className="relative flex flex-col items-center bg-white rounded-xl p-4 shadow-sm transition-shadow duration-200"
-                >
-                  <div className={`w-24 h-24 ${bgColor} rounded-full flex items-center justify-center p-2.5 mb-3`}>
-                    <CircularProgressbar
-                      value={score}
-                      maxValue={100}
-                      text={`${score}`}
-                      styles={buildStyles({
-                        textSize: "28px",
-                        textColor: color.replace("text-", "").replace("-600", "-900").replace("-700", "-900"),
-                        pathColor: progressColor,
-                        trailColor: "rgba(254, 254, 255, 0.66)",
-                        strokeLinecap: "round",
-                        pathTransitionDuration: 0.5,
-                      })}
-                    />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <div className={`font-bold text-base ${color} flex items-center gap-1`}>
-                      {label}
-                      <button
-                        type="button"
-                        aria-label={`Info about ${label}`}
-                        onClick={() => handleInfoToggle(label)}
-                        className="ml-1 cursor-pointer"
-                      >
-                        <svg
-                          className="w-4 h-4 text-indigo-400 transition"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                          viewBox="0 0 24 24"
-                        >
-                          <circle cx="12" cy="12" r="10" />
-                          <line x1="12" y1="16" x2="12" y2="12" />
-                          <circle cx="12" cy="8" r="1" />
-                        </svg>
-                      </button>
-                    </div>
-                    {/* Info Card */}
-                    {openInfo === label && (
-                      <div className="absolute z-50 top-0 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 rounded-lg shadow-lg p-3 w-44 text-xs text-gray-700 animate-fade-in">
-                        <div className="font-semibold mb-1">{label}</div>
-                        <div>{metricInfo[label]}</div>
-                        <button
-                          className="block ml-auto mt-0.5 text-indigo-600 hover:underline text-xs cursor-pointer"
-                          onClick={handleInfoClose}
-                        >
-                          Close
-                        </button>
-                      </div>
-                    )}
-                    <div className="text-xs text-gray-500 mt-1">
-                      {score < 30 ? "Building" : score < 60 ? "Advancing" : "Expert"}
-                    </div>
-                  </div>
-                </motion.div>
+              {reputationMetrics.map(metric => (
+                <MetricCard
+                  key={metric.label}
+                  metric={metric}
+                  onInfoToggle={handleInfoToggle}
+                  showInfo={openInfo === metric.label}
+                  infoContent={metricInfo[metric.label] || "No information available"}
+                />
               ))}
             </div>
           </motion.div>
@@ -572,7 +814,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                   <motion.li
                     key={index}
                     variants={itemVariants}
-                    className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg"
+                    className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                   >
                     <span className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 mt-0.5">
                       <SparklesIcon className="w-5 h-5" />
@@ -584,7 +826,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             </motion.div>
           )}
 
-          {/* Super Heroes Leaderboard */}
+          {/* Enhanced Super Heroes Leaderboard */}
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -600,10 +842,22 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
                 <motion.li
                   key={`${user.name}-${user.score}`}
                   variants={itemVariants}
-                  className={`flex justify-between items-center p-2 rounded ${user.isCurrentUser ? "bg-indigo-50" : ""}`}
+                  className={`flex justify-between items-center p-2 rounded transition-colors ${
+                    user.isCurrentUser ? "bg-indigo-50" : "hover:bg-gray-50"
+                  }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-xs font-medium text-indigo-800">
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                        index === 0
+                          ? "bg-yellow-100 text-yellow-800"
+                          : index === 1
+                            ? "bg-gray-100 text-gray-800"
+                            : index === 2
+                              ? "bg-orange-100 text-orange-800"
+                              : "bg-indigo-100 text-indigo-800"
+                      }`}
+                    >
                       {index + 1}
                     </span>
                     <span className={`font-medium ${user.isCurrentUser ? "text-indigo-700" : ""}`}>{user.name}</span>
@@ -616,18 +870,24 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
               ))}
             </ol>
             <div className="mt-4 text-center">
-              <Link href="/leaderboard" className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+              <Link
+                href="/leaderboard"
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+              >
                 View full leaderboard →
               </Link>
             </div>
           </motion.div>
 
-          {/* Tips & Next Steps */}
+          {/* Enhanced Tips & Next Steps */}
           <motion.div variants={containerVariants} initial="hidden" animate="visible" className="text-center">
             <motion.p variants={itemVariants} className="text-sm text-gray-600 max-w-md mx-auto">
               <small>Level up to unlock new perks, badges, and on-chain reputation power.</small>
               <br />
-              <Link href="/improve-score" className="text-indigo-600 hover:underline font-medium mt-2 inline-block">
+              <Link
+                href="/improve-score"
+                className="text-indigo-600 hover:underline font-medium mt-2 inline-block transition-colors"
+              >
                 How to improve your score →
               </Link>
             </motion.p>
