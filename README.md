@@ -47,6 +47,13 @@ In Web3, identity isn’t just a wallet address — it’s your actions. Unlloo 
 * [Blockscout](https://blockscout.com/) – API integration
 * [Flow](https://flow.com) - Smart contract platform
 
+### Architecture overview
+![image](https://github.com/user-attachments/assets/4923653c-4eb8-453f-960c-d676e8c7135b)
+
+
+![image](https://github.com/user-attachments/assets/f82fd80b-f09c-4079-b182-805fdabb1c3d)
+
+
 ---
 
 ## 👨‍💻 Meet the Team
