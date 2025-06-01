@@ -8,6 +8,7 @@ import { useAccount, useEnsAvatar, useEnsName } from "wagmi";
 import {
   ArrowUpIcon,
   ChartBarIcon,
+  CheckBadgeIcon,
   CurrencyDollarIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
@@ -117,12 +118,6 @@ const SPECIFIC_ACHIEVEMENTS: Achievement[] = [
     label: "WorldID Verified",
     description: "Verified human identity through WorldID",
     rarity: "epic",
-  },
-  {
-    key: "defi",
-    label: "DeFi Enthusiast",
-    description: "Active participant in DeFi protocols",
-    rarity: "common",
   },
 ];
 
@@ -260,10 +255,6 @@ const useReputationCalculations = (reputationScore: ReputationScoreData | null, 
     const achievements: string[] = [];
     if (reputationScore.ens) achievements.push("ENS Domain Owner");
     if (reputationScore.wordId) achievements.push("WorldID Verified");
-    if (reputationScore.overall > 70) achievements.push("High Reputation");
-    if (reputationScore.components.defiReputation > 50) achievements.push("DeFi Enthusiast");
-    if (reputationScore.components.daoActivity > 50) achievements.push("DAO Participant");
-    if (reputationScore.riskLevel >= 8) achievements.push("Low Risk Profile");
 
     // Future: Dynamic borrowing limit based on score
     const borrowingLimit =
@@ -664,7 +655,10 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
               variants={itemVariants}
               className="flex flex-col items-center bg-white rounded-xl p-5 shadow-sm border hover:shadow-md transition-shadow"
             >
-              <h3 className="text-lg font-medium text-gray-700 mb-3">Overall Score</h3>
+              <div className="flex items-center gap-2 mb-3">
+                <CheckBadgeIcon className="w-5 h-5 text-green-400 flex-shrink-0" />
+                <span className="text-lg font-medium text-green-400 flex items-center">Overall Score</span>
+              </div>
               <div className="w-32 h-32 mb-3">
                 <CircularProgressbar
                   value={overallScore}
@@ -695,7 +689,7 @@ export default function ReputationDashboard({ leaderboard = DEFAULT_LEADERBOARD 
             >
               <div className="flex items-center gap-2 mb-3">
                 <CurrencyDollarIcon className="w-5 h-5 text-indigo-600 flex-shrink-0" />
-                <span className="text-lg font-medium text-gray-700 flex items-center">Max Borrow</span>
+                <span className="text-lg font-medium text-indigo-600 flex items-center">Max Borrow</span>
               </div>
               <div className="text-2xl font-bold text-indigo-700 mb-1">
                 ${borrowingLimit.toFixed(2)}
