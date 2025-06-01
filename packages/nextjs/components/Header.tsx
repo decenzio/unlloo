@@ -82,11 +82,11 @@ export const Header = () => {
         </details>
         <Link href="/" passHref className="hidden lg:flex items-center gap-2 ml-4 mr-6 shrink-0">
           <div className="flex relative w-12 h-12">
-            <Image alt="SE2 logo" className="cursor-pointer" fill src="/logo.svg" />
+            <Image alt="SE2 logo" className="cursor-pointer" fill src="/logo.png" />
           </div>
           <div className="flex flex-col">
             <span className="font-bold leading-tight">Unlloo</span>
-            <span className="text-xs">Reputation loans </span>
+            <span className="text-xs">Reputation matters</span>
           </div>
         </Link>
         <ul className="hidden lg:flex lg:flex-nowrap menu menu-horizontal px-1 gap-2">
