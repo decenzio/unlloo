@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { Address } from "viem";
 import { useAccount } from "wagmi";
 import { TOKEN_ADDRESSES, getTokenMetadata, useLoanMaster } from "~~/hooks/custom/useLoanMaster";
@@ -22,7 +23,7 @@ const CryptoIcon = ({
 
   if (imageUrl && !imageError) {
     return (
-      <img
+      <Image
         src={imageUrl}
         alt={symbol}
         className="rounded-full object-cover"
